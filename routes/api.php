@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\RecommendationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class);
@@ -24,4 +25,5 @@ Route::middleware('auth.api')->group(function (): void {
     Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
     Route::patch('/profile/description', [ProfileController::class, 'updateDescription']);
     Route::patch('/profile/social-links', [ProfileController::class, 'updateSocialLinks']);
+    Route::get('/recommendations', [RecommendationController::class, 'index']);
 });
