@@ -1,0 +1,66 @@
+<?php
+
+namespace App\Repositories;
+
+use App\Contracts\Repositories\AuthRepositoryInterface;
+use App\Models\ApiToken;
+use App\Models\User;
+use Illuminate\Support\Str;
+
+class EloquentAuthRepository implements AuthRepositoryInterface
+{
+    public function createUser(array $data): User
+    {
+        return User::query()->create($data);
+    }
+
+    public function findUserByEmail(string $email): ?User
+    {
+        return User::query()->where('email', strtolower($email))->first();
+    }
+
+    public function createToken(User $user, string $name = 'default'): array
+    {
+        $plainToken = Str::random(80);
+
+        $apiToken = $user->apiTokens()->create([
+            'name' => $name,
+            'token' => hash('sha256', $plainToken),
+            'expires_at' => now()->addDays((int) config('auth.api_token_ttl_days', 30)),
+        ]);
+
+        return [
+            'token' => $plainToken,
+            'expires_at' => $apiToken->expires_at,
+        ];
+    }
+
+    public function findValidToken(string $plainToken): ?ApiToken
+    {
+        return ApiToken::query()
+            ->with('user')
+            ->where('token', hash('sha256', $plainToken))
+            ->whereNull('revoked_at')
+            ->where(function ($query): void {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->first();
+    }
+
+    public function markTokenAsUsed(ApiToken $token): void
+    {
+        $token->forceFill(['last_used_at' => now()])->save();
+    }
+
+    public function revokeToken(User $user, ?string $plainToken): void
+    {
+        if ($plainToken === null) {
+            return;
+        }
+
+        $user->apiTokens()
+            ->where('token', hash('sha256', $plainToken))
+            ->whereNull('revoked_at')
+            ->update(['revoked_at' => now()]);
+    }
+}
