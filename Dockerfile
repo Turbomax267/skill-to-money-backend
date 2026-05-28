@@ -1,17 +1,25 @@
-FROM richarvey/nginx-php-fpm:latest
+FROM php:8.3-apache
 
 WORKDIR /var/www/html
+
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 COPY . .
 
 RUN composer install --no-dev --optimize-autoloader
 
-RUN php artisan config:clear
-RUN php artisan route:clear
-RUN php artisan view:clear
+RUN a2enmod rewrite
+
+RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
 
 RUN chmod -R 775 storage bootstrap/cache
 
-ENV WEBROOT=/var/www/html/public
+EXPOSE 80
 
-CMD php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache && /start.sh
+CMD php artisan migrate --force && php artisan config:cache && apache2-foreground
