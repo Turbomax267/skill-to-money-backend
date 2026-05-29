@@ -9,7 +9,7 @@ class UpdateDescriptionRequest extends ApiRequest
     public function rules(): array
     {
         return [
-            'description' => ['required', 'string', 'min:10', 'max:1000'],
+            'description' => ['required', 'string', 'max:1000'],
         ];
     }
 }
