@@ -13,6 +13,7 @@ use App\Http\Requests\Profile\UpdateSocialLinksRequest;
 use App\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class ProfileController extends Controller
 {
@@ -50,11 +51,17 @@ class ProfileController extends Controller
 
     public function updatePhoto(UpdateProfilePhotoRequest $request): JsonResponse
     {
-        $profile = $this->profileService->updatePhoto(
-            $request->user(),
-            $request->file('photo'),
-            $request->validated('photo_url')
-        );
+        try {
+            $profile = $this->profileService->updatePhoto(
+                $request->user(),
+                $request->file('photo'),
+                $request->validated('photo_url')
+            );
+        } catch (Throwable) {
+            return $this->error('The profile photo could not be saved.', [
+                'photo' => ['The server could not store the uploaded image.'],
+            ], 500);
+        }
 
         return $this->success('Profile photo updated.', $profile);
     }

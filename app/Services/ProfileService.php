@@ -8,6 +8,7 @@ use App\Models\ProfessionalProfile;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class ProfileService implements ProfileServiceInterface
 {
@@ -41,6 +42,11 @@ class ProfileService implements ProfileServiceInterface
     {
         if ($photo !== null) {
             $path = $photo->store('profile-photos', 'public');
+
+            if ($path === false) {
+                throw new RuntimeException('The profile photo could not be stored.');
+            }
+
             $photoUrl = Storage::disk('public')->url($path);
         }
 
