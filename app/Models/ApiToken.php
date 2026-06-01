@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ApiToken extends Model
 {
     protected $fillable = [
+        'user_id',
         'name',
         'token',
         'last_used_at',

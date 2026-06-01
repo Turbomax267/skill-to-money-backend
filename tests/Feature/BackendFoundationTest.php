@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class SprintOneApiTest extends TestCase
+class BackendFoundationTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -20,7 +20,7 @@ class SprintOneApiTest extends TestCase
             ->assertJson(['status' => 'ok']);
     }
 
-    public function test_freelancer_auth_and_profile_flow(): void
+    public function test_register_login_module_status_and_logout_flow(): void
     {
         $register = $this->postJson('/api/auth/register/freelancer', [
             'first_name' => 'Camila',
@@ -31,34 +31,31 @@ class SprintOneApiTest extends TestCase
 
         $register->assertCreated()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.user_type', 'freelancer')
             ->assertJsonPath('data.user.account_type', 'freelancer');
 
         $token = $register->json('data.access_token');
 
-        $this->withToken($token)->postJson('/api/profile', [
-            'headline' => 'Disenadora grafica',
-            'category' => 'diseno',
-            'location' => 'Lima, PE',
-            'hourly_rate' => 90,
-        ])->assertCreated()
+        $this->withToken($token)->getJson('/api/users')
+            ->assertOk()
+            ->assertJsonPath('data.module', 'users');
+
+        $this->withToken($token)->getJson('/api/profiles')
+            ->assertOk()
+            ->assertJsonPath('data.module', 'profiles');
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'camila@example.com',
+            'password' => 'password123',
+        ])->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.headline', 'Disenadora grafica');
-
-        $this->withToken($token)->patchJson('/api/profile/skills', [
-            'skills' => ['Branding', 'Logos', 'Social Media'],
-        ])->assertOk()
-            ->assertJsonPath('data.skills.0', 'Branding');
-
-        $this->withToken($token)->patchJson('/api/profile/description', [
-            'description' => 'Creo marcas visuales claras para negocios digitales.',
-        ])->assertOk()
-            ->assertJsonPath('data.description', 'Creo marcas visuales claras para negocios digitales.');
+            ->assertJsonPath('data.user.user_type', 'freelancer');
 
         $this->withToken($token)->postJson('/api/auth/logout')
             ->assertOk()
             ->assertJsonPath('success', true);
 
-        $this->withToken($token)->getJson('/api/profile')
+        $this->withToken($token)->getJson('/api/users')
             ->assertUnauthorized();
     }
 }

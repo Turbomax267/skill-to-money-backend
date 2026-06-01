@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MypeProfile extends Model
 {
@@ -12,22 +13,19 @@ class MypeProfile extends Model
         'business_name',
         'ruc',
         'industry',
-        'contact_name',
+        'description',
         'website',
-        'business_description',
-        'rating',
+        'location',
+        'profile_photo',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'rating' => 'decimal:2',
-        ];
-    }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
-}
 
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(Favorite::class);
+    }
+}

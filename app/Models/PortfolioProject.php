@@ -11,7 +11,7 @@ class PortfolioProject extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'portfolio_id',
+        'freelancer_profile_id',
         'category_id',
         'title',
         'description',
@@ -20,7 +20,6 @@ class PortfolioProject extends Model
         'external_url',
         'project_order',
         'is_featured',
-        'status',
     ];
 
     protected function casts(): array
@@ -31,9 +30,9 @@ class PortfolioProject extends Model
         ];
     }
 
-    public function portfolio(): BelongsTo
+    public function freelancer(): BelongsTo
     {
-        return $this->belongsTo(Portfolio::class);
+        return $this->belongsTo(FreelancerProfile::class, 'freelancer_profile_id');
     }
 
     public function category(): BelongsTo
@@ -41,4 +40,3 @@ class PortfolioProject extends Model
         return $this->belongsTo(Category::class);
     }
 }
-

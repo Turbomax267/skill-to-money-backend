@@ -10,24 +10,23 @@ return new class extends Migration
     {
         Schema::create('skills', function (Blueprint $table): void {
             $table->id();
-            $table->string('name', 120)->index();
-            $table->text('description')->nullable();
-            $table->string('category', 80)->nullable()->index();
+            $table->string('name', 100)->unique();
+            $table->string('category', 100)->nullable()->index();
             $table->timestamps();
         });
 
-        Schema::create('skill_user', function (Blueprint $table): void {
+        Schema::create('freelancer_skills', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('freelancer_profile_id')->constrained()->cascadeOnDelete();
             $table->foreignId('skill_id')->constrained()->cascadeOnDelete();
-            $table->string('level', 30)->nullable();
+            $table->string('level', 50)->nullable();
             $table->timestamps();
-            $table->unique(['user_id', 'skill_id']);
+            $table->unique(['freelancer_profile_id', 'skill_id']);
         });
 
         Schema::create('categories', function (Blueprint $table): void {
             $table->id();
-            $table->string('name', 120)->unique();
+            $table->string('name', 100)->unique();
             $table->text('description')->nullable();
             $table->string('status', 30)->default('active')->index();
             $table->timestamps();
@@ -37,8 +36,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('categories');
-        Schema::dropIfExists('skill_user');
+        Schema::dropIfExists('freelancer_skills');
         Schema::dropIfExists('skills');
     }
 };
-
