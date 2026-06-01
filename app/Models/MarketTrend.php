@@ -15,8 +15,6 @@ class MarketTrend extends Model
         'average_price',
         'currency',
         'source',
-        'period_start',
-        'period_end',
     ];
 
     protected function casts(): array
@@ -24,8 +22,6 @@ class MarketTrend extends Model
         return [
             'demand_score' => 'decimal:2',
             'average_price' => 'decimal:2',
-            'period_start' => 'date',
-            'period_end' => 'date',
         ];
     }
 
@@ -34,4 +30,3 @@ class MarketTrend extends Model
         return $this->belongsTo(Category::class);
     }
 }
-

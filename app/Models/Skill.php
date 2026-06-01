@@ -9,13 +9,13 @@ class Skill extends Model
 {
     protected $fillable = [
         'name',
-        'description',
         'category',
     ];
 
-    public function users(): BelongsToMany
+    public function freelancerProfiles(): BelongsToMany
     {
-        return $this->belongsToMany(User::class)->withPivot('level')->withTimestamps();
+        return $this->belongsToMany(FreelancerProfile::class, 'freelancer_skills')
+            ->withPivot('level')
+            ->withTimestamps();
     }
 }
-

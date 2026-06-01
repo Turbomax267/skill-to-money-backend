@@ -6,12 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
-class RecommendationController extends Controller
+class UsersController extends Controller
 {
     use ApiResponse;
 
     public function index(): JsonResponse
     {
-        return $this->success('Recommendations module ready.', ['module' => 'recommendations']);
+        return $this->success('Users module ready.', ['module' => 'users']);
     }
 }

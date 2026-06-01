@@ -23,14 +23,8 @@ class Category extends Model
         return $this->hasMany(PortfolioProject::class);
     }
 
-    public function serviceRequests(): HasMany
-    {
-        return $this->hasMany(ServiceRequest::class);
-    }
-
     public function marketTrends(): HasMany
     {
         return $this->hasMany(MarketTrend::class);
     }
 }
-

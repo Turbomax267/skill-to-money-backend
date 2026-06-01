@@ -12,7 +12,7 @@ class Service extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'freelancer_id',
+        'freelancer_profile_id',
         'category_id',
         'title',
         'description',
@@ -20,8 +20,6 @@ class Service extends Model
         'currency',
         'delivery_days',
         'status',
-        'tags',
-        'requirements',
         'views_count',
     ];
 
@@ -30,14 +28,13 @@ class Service extends Model
         return [
             'price' => 'decimal:2',
             'delivery_days' => 'integer',
-            'tags' => 'array',
             'views_count' => 'integer',
         ];
     }
 
     public function freelancer(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'freelancer_id');
+        return $this->belongsTo(FreelancerProfile::class, 'freelancer_profile_id');
     }
 
     public function category(): BelongsTo
@@ -47,7 +44,6 @@ class Service extends Model
 
     public function matches(): HasMany
     {
-        return $this->hasMany(MatchResult::class, 'service_id');
+        return $this->hasMany(MatchResult::class);
     }
 }
-

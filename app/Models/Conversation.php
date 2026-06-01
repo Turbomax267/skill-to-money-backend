@@ -9,10 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Conversation extends Model
 {
     protected $fillable = [
-        'mype_id',
-        'freelancer_id',
+        'mype_profile_id',
+        'freelancer_profile_id',
         'service_id',
-        'service_request_id',
         'status',
         'last_message_at',
     ];
@@ -26,12 +25,12 @@ class Conversation extends Model
 
     public function mype(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'mype_id');
+        return $this->belongsTo(MypeProfile::class, 'mype_profile_id');
     }
 
     public function freelancer(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'freelancer_id');
+        return $this->belongsTo(FreelancerProfile::class, 'freelancer_profile_id');
     }
 
     public function service(): BelongsTo
@@ -39,14 +38,8 @@ class Conversation extends Model
         return $this->belongsTo(Service::class);
     }
 
-    public function serviceRequest(): BelongsTo
-    {
-        return $this->belongsTo(ServiceRequest::class);
-    }
-
     public function messages(): HasMany
     {
         return $this->hasMany(Message::class);
     }
 }
-

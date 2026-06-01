@@ -1,33 +1,77 @@
 # Skill To Money API
 
-Backend Laravel para el Sprint 1 de Skill To Money. Esta API esta preparada para desplegarse en Render, conectarse a Supabase PostgreSQL y ser consumida por el frontend en Lovable.
+Backend Laravel para Skill To Money. El backend se despliega en Render, usa PostgreSQL en Render y es consumido por el frontend en Lovable.
 
-## Arquitectura
+## Estado actual
 
-El flujo obligatorio del Sprint 1 es:
+Esta version deja una base limpia para crecer por modulos:
 
 ```txt
-Controller -> Service -> Repository -> Database
+Auth
+Users
+Profiles
+Catalog
+Marketplace
+Messaging
+Recommendations
+Health
 ```
 
-Responsabilidades:
+Auth custom queda funcional usando tokens Bearer en la tabla `api_tokens`.
 
-- `app/Http/Controllers/Api`: recibe requests, llama servicios y retorna JSON.
-- `app/Services`: contiene logica de negocio y orquestacion.
-- `app/Repositories`: contiene consultas y persistencia.
-- `app/Contracts`: interfaces para services y repositories.
-- `app/Providers/AppServiceProvider.php`: bindings de interfaces a implementaciones.
+## Estructura principal
 
-La respuesta JSON estandar es:
-
-```json
-{
-  "success": true,
-  "message": "Message",
-  "data": {},
-  "errors": null
-}
+```txt
+app/Http/Controllers/Api
+app/Http/Middleware
+app/Http/Requests
+app/Http/Responses
+app/Models
+app/Repositories
+app/Services
+database/migrations
+routes/api.php
+routes/web.php
 ```
+
+Controllers actuales:
+
+```txt
+AuthController
+UsersController
+ProfilesController
+CatalogController
+MarketplaceController
+MessagingController
+RecommendationController
+HealthController
+```
+
+## Base de datos
+
+Tablas principales:
+
+```txt
+users
+api_tokens
+password_reset_tokens
+freelancer_profiles
+mype_profiles
+skills
+freelancer_skills
+categories
+services
+portfolio_projects
+favorites
+conversations
+messages
+notifications
+recommendations
+matches
+market_trends
+```
+
+`freelancer_profiles` incluye `dni` como `VARCHAR(20) NULL`.
 
 ## Setup local
 
@@ -47,7 +91,7 @@ http://127.0.0.1:8000
 
 ## Variables de entorno
 
-Variables principales:
+Variables clave para Render:
 
 ```env
 APP_ENV=production
@@ -57,67 +101,60 @@ FRONTEND_URL=https://your-lovable-app.lovable.app
 CORS_ALLOWED_ORIGINS=https://your-lovable-app.lovable.app,http://localhost:5173
 
 DB_CONNECTION=pgsql
-DB_HOST=aws-0-us-east-1.pooler.supabase.com
-DB_PORT=6543
-DB_DATABASE=postgres
-DB_USERNAME=postgres.your-project-ref
-DB_PASSWORD=your-supabase-password
+DB_HOST=your-render-postgres-host
+DB_PORT=5432
+DB_DATABASE=your-render-postgres-database
+DB_USERNAME=your-render-postgres-user
+DB_PASSWORD=your-render-postgres-password
 DB_SSLMODE=require
 ```
 
+No subir `.env` real al repositorio.
+
 ## Render
 
-Build command:
+Si se despliega con Docker, Render usa el `Dockerfile`.
+
+El contenedor ejecuta:
 
 ```bash
-composer install --no-dev --optimize-autoloader && php artisan config:cache && php artisan route:cache
+php artisan migrate --force && php artisan config:cache && apache2-foreground
 ```
 
-Start command:
-
-```bash
-php artisan serve --host=0.0.0.0 --port=$PORT
-```
-
-Health check:
-
-```txt
-GET /health
-```
-
-## Endpoints Sprint 1
-
-Health:
+Health checks:
 
 ```txt
 GET /health
 GET /api/health
 ```
 
-Auth:
+## Endpoints actuales
+
+Publicos:
 
 ```txt
+GET /health
+GET /api/health
+POST /api/auth/register
 POST /api/auth/register/freelancer
 POST /api/auth/register/mype
 POST /api/auth/login
 POST /api/auth/forgot-password
-POST /api/auth/logout
 ```
 
-Perfil:
+Protegidos con Bearer token:
 
 ```txt
-GET /api/profile
-POST /api/profile
-PUT /api/profile
-PATCH /api/profile
-PATCH /api/profile/skills
-POST /api/profile/photo
-PATCH /api/profile/description
-PATCH /api/profile/social-links
+POST /api/auth/logout
+GET /api/users
+GET /api/profiles
+GET /api/catalog
+GET /api/marketplace
+GET /api/messaging
+GET /api/recommendations
 ```
 
-Los endpoints protegidos usan:
+Header requerido:
 
 ```txt
 Authorization: Bearer {access_token}
@@ -136,18 +173,6 @@ Registro freelancer:
 }
 ```
 
-Registro MYPE:
-
-```json
-{
-  "first_name": "Luis",
-  "last_name": "Torres",
-  "company_name": "Lumen Cafe",
-  "email": "luis@example.com",
-  "password": "password123"
-}
-```
-
 Login:
 
 ```json
@@ -157,48 +182,43 @@ Login:
 }
 ```
 
-Crear/editar perfil:
+Respuesta de Auth:
 
 ```json
 {
-  "headline": "Disenadora grafica",
-  "category": "diseno",
-  "bio": "Branding para MYPEs",
-  "description": "Creo marcas visuales claras para negocios digitales.",
-  "location": "Lima, PE",
-  "hourly_rate": 90,
-  "skills": ["Branding", "Logos", "Social Media"],
-  "photo_url": "https://example.com/photo.jpg"
+  "success": true,
+  "message": "Session started.",
+  "data": {
+    "token_type": "Bearer",
+    "access_token": "token",
+    "expires_at": "date",
+    "user": {
+      "id": 1,
+      "name": "Camila Rojas",
+      "email": "camila@example.com",
+      "user_type": "freelancer",
+      "account_type": "freelancer"
+    }
+  },
+  "errors": null
 }
 ```
-
-Redes sociales:
-
-```json
-{
-  "social_links": {
-    "linkedin": "https://linkedin.com/in/camila",
-    "instagram": "https://instagram.com/camila",
-    "website": "https://camila.dev"
-  }
-}
-```
-
-## Checklist Sprint 1
-
-- `GET /health` responde `{"status":"ok"}`.
-- `GET /api/health` responde `{"status":"ok"}`.
-- CORS permite Lovable y localhost.
-- Supabase usa `pgsql` con `DB_SSLMODE=require`.
-- Auth registra freelancer y MYPE.
-- Auth login devuelve `access_token`.
-- Logout revoca el token actual.
-- Perfil permite crear, editar, habilidades, foto, descripcion y redes.
-- README y `.env.example` no contienen secretos reales.
 
 ## Validacion
 
 ```bash
 php artisan migrate
 php artisan test
+```
+
+## Checklist
+
+```txt
+[ ] Configurar APP_URL en Render
+[ ] Configurar CORS_ALLOWED_ORIGINS con dominio Lovable
+[ ] Configurar PostgreSQL de Render
+[ ] Confirmar GET /health
+[ ] Confirmar POST /api/auth/register/freelancer
+[ ] Confirmar POST /api/auth/login
+[ ] Confirmar POST /api/auth/logout
 ```

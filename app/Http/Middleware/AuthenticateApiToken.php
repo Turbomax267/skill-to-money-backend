@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Contracts\Repositories\AuthRepositoryInterface;
+use App\Repositories\AuthRepository;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AuthenticateApiToken
 {
-    public function __construct(private readonly AuthRepositoryInterface $authRepository)
+    public function __construct(private readonly AuthRepository $authRepository)
     {
     }
 

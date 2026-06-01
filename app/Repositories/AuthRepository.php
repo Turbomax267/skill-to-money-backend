@@ -2,12 +2,11 @@
 
 namespace App\Repositories;
 
-use App\Contracts\Repositories\AuthRepositoryInterface;
 use App\Models\ApiToken;
 use App\Models\User;
 use Illuminate\Support\Str;
 
-class EloquentAuthRepository implements AuthRepositoryInterface
+class AuthRepository
 {
     public function createUser(array $data): User
     {
@@ -19,7 +18,7 @@ class EloquentAuthRepository implements AuthRepositoryInterface
         return User::query()->where('email', strtolower($email))->first();
     }
 
-    public function createToken(User $user, string $name = 'default'): array
+    public function createToken(User $user, string $name = 'auth'): array
     {
         $plainToken = Str::random(80);
 

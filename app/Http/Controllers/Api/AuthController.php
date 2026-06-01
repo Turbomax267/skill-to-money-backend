@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Contracts\Services\AuthServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Requests\Auth\RegisterFreelancerRequest;
-use App\Http\Requests\Auth\RegisterMypeRequest;
+use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Responses\ApiResponse;
+use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,20 +15,27 @@ class AuthController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(private readonly AuthServiceInterface $authService)
+    public function __construct(private readonly AuthService $authService)
     {
     }
 
-    public function registerFreelancer(RegisterFreelancerRequest $request): JsonResponse
+    public function register(RegisterRequest $request): JsonResponse
     {
-        $result = $this->authService->registerFreelancer($request->validated());
+        $result = $this->authService->register($request->validated());
+
+        return $this->success('Account created.', $result, 201);
+    }
+
+    public function registerFreelancer(RegisterRequest $request): JsonResponse
+    {
+        $result = $this->authService->register($request->validated(), 'freelancer');
 
         return $this->success('Freelancer account created.', $result, 201);
     }
 
-    public function registerMype(RegisterMypeRequest $request): JsonResponse
+    public function registerMype(RegisterRequest $request): JsonResponse
     {
-        $result = $this->authService->registerMype($request->validated());
+        $result = $this->authService->register($request->validated(), 'mype');
 
         return $this->success('MYPE account created.', $result, 201);
     }

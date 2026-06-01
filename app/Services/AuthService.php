@@ -2,26 +2,35 @@
 
 namespace App\Services;
 
-use App\Contracts\Repositories\AuthRepositoryInterface;
-use App\Contracts\Services\AuthServiceInterface;
 use App\Models\User;
+use App\Repositories\AuthRepository;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 
-class AuthService implements AuthServiceInterface
+class AuthService
 {
-    public function __construct(private readonly AuthRepositoryInterface $authRepository)
+    private const USER_TYPES = ['admin', 'freelancer', 'mype'];
+
+    public function __construct(private readonly AuthRepository $authRepository)
     {
     }
 
-    public function registerFreelancer(array $data): array
+    public function register(array $data, ?string $forcedUserType = null): array
     {
-        return $this->register($data, 'freelancer');
-    }
+        $userType = $forcedUserType ?? ($data['user_type'] ?? 'freelancer');
 
-    public function registerMype(array $data): array
-    {
-        return $this->register($data, 'mype');
+        if (! in_array($userType, self::USER_TYPES, true)) {
+            $userType = 'freelancer';
+        }
+
+        $user = $this->authRepository->createUser([
+            'name' => $this->resolveName($data),
+            'email' => strtolower($data['email']),
+            'password' => $data['password'],
+            'user_type' => $userType,
+        ]);
+
+        return $this->authenticatedPayload($user);
     }
 
     public function login(array $credentials): ?array
@@ -45,31 +54,37 @@ class AuthService implements AuthServiceInterface
         $this->authRepository->revokeToken($user, $plainToken);
     }
 
-    private function register(array $data, string $accountType): array
-    {
-        $user = $this->authRepository->createUser([
-            'name' => trim($data['first_name'].' '.$data['last_name']),
-            'first_name' => $data['first_name'],
-            'last_name' => $data['last_name'],
-            'company_name' => $data['company_name'] ?? null,
-            'account_type' => $accountType,
-            'phone' => $data['phone'] ?? null,
-            'email' => strtolower($data['email']),
-            'password' => $data['password'],
-        ]);
-
-        return $this->authenticatedPayload($user);
-    }
-
     private function authenticatedPayload(User $user): array
     {
         $token = $this->authRepository->createToken($user, 'auth');
+        $freshUser = $user->fresh();
 
         return [
             'token_type' => 'Bearer',
             'access_token' => $token['token'],
             'expires_at' => $token['expires_at'],
-            'user' => $user->fresh(),
+            'user' => [
+                'id' => $freshUser->id,
+                'name' => $freshUser->name,
+                'email' => $freshUser->email,
+                'user_type' => $freshUser->user_type,
+                'account_type' => $freshUser->user_type,
+            ],
         ];
+    }
+
+    private function resolveName(array $data): string
+    {
+        if (! empty($data['name'])) {
+            return trim($data['name']);
+        }
+
+        $name = trim(($data['first_name'] ?? '').' '.($data['last_name'] ?? ''));
+
+        if ($name !== '') {
+            return $name;
+        }
+
+        return strtolower($data['email']);
     }
 }

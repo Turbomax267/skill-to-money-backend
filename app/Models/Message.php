@@ -9,7 +9,7 @@ class Message extends Model
 {
     protected $fillable = [
         'conversation_id',
-        'sender_id',
+        'sender_user_id',
         'message',
         'attachment_path',
         'read_at',
@@ -29,7 +29,6 @@ class Message extends Model
 
     public function sender(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'sender_id');
+        return $this->belongsTo(User::class, 'sender_user_id');
     }
 }
-
