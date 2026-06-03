@@ -4,14 +4,19 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Repositories\AuthRepository;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
     private const USER_TYPES = ['admin', 'freelancer', 'mype'];
 
-    public function __construct(private readonly AuthRepository $authRepository)
+    public function __construct(
+        private readonly AuthRepository $authRepository,
+        private readonly PeruApiService $peruApiService,
+    )
     {
     }
 
@@ -23,12 +28,46 @@ class AuthService
             $userType = 'freelancer';
         }
 
-        $user = $this->authRepository->createUser([
-            'name' => $this->resolveName($data),
-            'email' => strtolower($data['email']),
-            'password' => $data['password'],
-            'user_type' => $userType,
-        ]);
+        $mypeProfileData = null;
+        $freelancerProfileData = null;
+
+        if ($userType === 'mype') {
+            $mypeProfileData = $this->peruApiService->validateRuc($data['ruc']);
+
+            if (! $mypeProfileData['valid']) {
+                throw ValidationException::withMessages([
+                    'ruc' => [$mypeProfileData['message']],
+                ]);
+            }
+        } elseif ($userType === 'freelancer') {
+            $freelancerProfileData = [
+                'dni' => $data['dni'],
+                'experience_area' => $data['experience_area'] ?? 'No especificada',
+            ];
+        }
+
+        $user = DB::transaction(function () use ($data, $userType, $mypeProfileData, $freelancerProfileData): User {
+            $user = $this->authRepository->createUser([
+                'name' => $this->resolveName($data),
+                'email' => strtolower($data['email']),
+                'password' => $data['password'],
+                'user_type' => $userType,
+            ]);
+
+            if ($mypeProfileData !== null) {
+                $user->mypeProfile()->create([
+                    'business_name' => $mypeProfileData['business_name'],
+                    'ruc' => $mypeProfileData['ruc'],
+                    'location' => $mypeProfileData['location'],
+                ]);
+            }
+
+            if ($freelancerProfileData !== null) {
+                $user->freelancerProfile()->create($freelancerProfileData);
+            }
+
+            return $user;
+        });
 
         return $this->authenticatedPayload($user);
     }
@@ -57,9 +96,9 @@ class AuthService
     private function authenticatedPayload(User $user): array
     {
         $token = $this->authRepository->createToken($user, 'auth');
-        $freshUser = $user->fresh();
+        $freshUser = $user->fresh(['freelancerProfile', 'mypeProfile']);
 
-        return [
+        $payload = [
             'token_type' => 'Bearer',
             'access_token' => $token['token'],
             'expires_at' => $token['expires_at'],
@@ -71,6 +110,25 @@ class AuthService
                 'account_type' => $freshUser->user_type,
             ],
         ];
+
+        if ($freshUser->freelancerProfile !== null) {
+            $payload['freelancer_profile'] = [
+                'id' => $freshUser->freelancerProfile->id,
+                'dni' => $freshUser->freelancerProfile->dni,
+                'experience_area' => $freshUser->freelancerProfile->experience_area,
+            ];
+        }
+
+        if ($freshUser->mypeProfile !== null) {
+            $payload['mype_profile'] = [
+                'id' => $freshUser->mypeProfile->id,
+                'business_name' => $freshUser->mypeProfile->business_name,
+                'ruc' => $freshUser->mypeProfile->ruc,
+                'location' => $freshUser->mypeProfile->location,
+            ];
+        }
+
+        return $payload;
     }
 
     private function resolveName(array $data): string
