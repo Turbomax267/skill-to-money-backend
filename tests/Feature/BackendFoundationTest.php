@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class BackendFoundationTest extends TestCase
@@ -25,6 +26,7 @@ class BackendFoundationTest extends TestCase
         $register = $this->postJson('/api/auth/register/freelancer', [
             'first_name' => 'Camila',
             'last_name' => 'Rojas',
+            'dni' => '12345678',
             'email' => 'camila@example.com',
             'password' => 'password123',
         ]);
@@ -32,7 +34,8 @@ class BackendFoundationTest extends TestCase
         $register->assertCreated()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.user.user_type', 'freelancer')
-            ->assertJsonPath('data.user.account_type', 'freelancer');
+            ->assertJsonPath('data.user.account_type', 'freelancer')
+            ->assertJsonPath('data.freelancer_profile.dni', '12345678');
 
         $token = $register->json('data.access_token');
 
@@ -57,5 +60,84 @@ class BackendFoundationTest extends TestCase
 
         $this->withToken($token)->getJson('/api/users')
             ->assertUnauthorized();
+    }
+
+    public function test_register_rejects_invalid_name_last_name_and_email(): void
+    {
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Camila123',
+            'last_name' => 'Rojas!',
+            'dni' => '12345678',
+            'email' => 'camila.example.com',
+            'password' => 'password123',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Validation failed.')
+            ->assertJsonValidationErrors(['first_name', 'last_name', 'email']);
+    }
+
+    public function test_register_freelancer_rejects_dni_with_letters(): void
+    {
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Camila',
+            'last_name' => 'Rojas',
+            'dni' => '12ABC678',
+            'email' => 'camila@example.com',
+            'password' => 'password123',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['dni']);
+    }
+
+    public function test_register_mype_rejects_ruc_with_letters(): void
+    {
+        $this->postJson('/api/auth/register/mype', [
+            'first_name' => 'Lucia',
+            'last_name' => 'Torres',
+            'ruc' => '20ABC123456',
+            'email' => 'lucia@example.com',
+            'password' => 'password123',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['ruc']);
+    }
+
+    public function test_register_mype_uses_peru_api_business_name(): void
+    {
+        config(['services.peru_api.key' => 'fake-key']);
+
+        Http::fake([
+            'https://peruapi.com/api/ruc/20601234567*' => Http::response([
+                'ruc' => '20601234567',
+                'razon_social' => 'SKILL TO MONEY S.A.C.',
+                'estado' => 'ACTIVO',
+                'condicion' => 'HABIDO',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'MIRAFLORES',
+                'mensaje' => 'OK',
+                'code' => '200',
+            ]),
+        ]);
+
+        $this->postJson('/api/auth/register/mype', [
+            'first_name' => 'Lucia',
+            'last_name' => 'Torres',
+            'company_name' => 'Nombre editable ignorado',
+            'ruc' => '20601234567',
+            'email' => 'lucia@example.com',
+            'password' => 'password123',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.user_type', 'mype')
+            ->assertJsonPath('data.mype_profile.business_name', 'SKILL TO MONEY S.A.C.')
+            ->assertJsonPath('data.mype_profile.ruc', '20601234567');
+
+        $this->assertDatabaseHas('mype_profiles', [
+            'business_name' => 'SKILL TO MONEY S.A.C.',
+            'ruc' => '20601234567',
+        ]);
     }
 }

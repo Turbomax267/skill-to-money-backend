@@ -12,4 +12,11 @@ class ForgotPasswordRequest extends ApiRequest
             'email' => ['required', 'email'],
         ];
     }
+
+    public function messages(): array
+    {
+        return [
+            'email.email' => 'Coloque un correo valido.',
+        ];
+    }
 }
