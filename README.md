@@ -107,9 +107,38 @@ DB_DATABASE=your-render-postgres-database
 DB_USERNAME=your-render-postgres-user
 DB_PASSWORD=your-render-postgres-password
 DB_SSLMODE=require
+
+MAIL_MAILER=resend
+MAIL_FROM_ADDRESS=onboarding@resend.dev
+MAIL_FROM_NAME="Skill To Money"
+RESEND_API_KEY=re_xxxxxxxxx
 ```
 
 No subir `.env` real al repositorio.
+
+## Correo con Resend
+
+El backend ya queda preparado para usar Resend como proveedor de correo en Render.
+
+Pasos:
+
+1. Crear una cuenta en Resend.
+2. Generar una API key.
+3. Configurar estas variables en Render:
+
+```env
+MAIL_MAILER=resend
+MAIL_FROM_ADDRESS=onboarding@resend.dev
+MAIL_FROM_NAME="Skill To Money"
+RESEND_API_KEY=re_xxxxxxxxx
+```
+
+4. Hacer redeploy del backend.
+
+Notas:
+
+- Ya no es necesario usar `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` ni `MAIL_SCHEME` cuando `MAIL_MAILER=resend`.
+- Para produccion, lo ideal es verificar un dominio propio en Resend y reemplazar `onboarding@resend.dev` por un remitente de tu dominio.
 
 ## Render
 
