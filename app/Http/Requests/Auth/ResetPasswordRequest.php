@@ -3,8 +3,9 @@
 namespace App\Http\Requests\Auth;
 
 use App\Http\Requests\ApiRequest;
+use Illuminate\Validation\Rules\Password;
 
-class ForgotPasswordRequest extends ApiRequest
+class ResetPasswordRequest extends ApiRequest
 {
     protected function prepareForValidation(): void
     {
@@ -16,15 +17,9 @@ class ForgotPasswordRequest extends ApiRequest
     public function rules(): array
     {
         return [
+            'token' => ['required', 'string'],
             'email' => ['required', 'email:rfc', 'exists:users,email'],
-        ];
-    }
-
-    public function messages(): array
-    {
-        return [
-            'email.exists' => 'No encontramos una cuenta con ese correo.',
-            'email.email' => 'Ingresa un correo valido.',
+            'password' => ['required', 'confirmed', Password::min(8)],
         ];
     }
 }

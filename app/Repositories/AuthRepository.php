@@ -1,8 +1,10 @@
-<?php
+﻿<?php
 
 namespace App\Repositories;
 
 use App\Models\ApiToken;
+use App\Models\FreelancerProfile;
+use App\Models\MypeProfile;
 use App\Models\User;
 use Illuminate\Support\Str;
 
@@ -11,6 +13,25 @@ class AuthRepository
     public function createUser(array $data): User
     {
         return User::query()->create($data);
+    }
+
+    public function createFreelancerProfile(User $user, array $data): FreelancerProfile
+    {
+        return $user->freelancerProfile()->create([
+            'dni' => $data['dni'],
+            'experience_area' => $data['experience_area'] ?? 'Por definir',
+            'contact_phone' => $data['phone'] ?? null,
+            'availability_status' => 'available',
+            'visibility_score' => 0,
+        ]);
+    }
+
+    public function createMypeProfile(User $user, array $data): MypeProfile
+    {
+        return $user->mypeProfile()->create([
+            'business_name' => $data['business_name'] ?? $data['company_name'],
+            'ruc' => $data['ruc'],
+        ]);
     }
 
     public function findUserByEmail(string $email): ?User
