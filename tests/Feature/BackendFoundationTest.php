@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Mail\WelcomeAccountMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -23,6 +25,8 @@ class BackendFoundationTest extends TestCase
 
     public function test_register_login_module_status_and_logout_flow(): void
     {
+        Mail::fake();
+
         $register = $this->postJson('/api/auth/register/freelancer', [
             'first_name' => 'Camila',
             'last_name' => 'Rojas',
@@ -37,6 +41,8 @@ class BackendFoundationTest extends TestCase
             ->assertJsonPath('data.user.account_type', 'freelancer')
             ->assertJsonPath('data.freelancer_profile.dni', '12345678');
 
+        Mail::assertSent(WelcomeAccountMail::class);
+
         $token = $register->json('data.access_token');
 
         $this->withToken($token)->getJson('/api/users')
@@ -48,7 +54,7 @@ class BackendFoundationTest extends TestCase
             ->assertJsonPath('data.module', 'profiles');
 
         $this->postJson('/api/auth/login', [
-            'email' => 'camila@example.com',
+            'email' => 'camila@gmail.com',
             'password' => 'password123',
         ])->assertOk()
             ->assertJsonPath('success', true)

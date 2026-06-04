@@ -2,11 +2,15 @@
 
 namespace App\Services;
 
+use App\Mail\WelcomeAccountMail;
 use App\Models\User;
 use App\Repositories\AuthRepository;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthService
@@ -16,8 +20,7 @@ class AuthService
     public function __construct(
         private readonly AuthRepository $authRepository,
         private readonly PeruApiService $peruApiService,
-    )
-    {
+    ) {
     }
 
     public function register(array $data, ?string $forcedUserType = null): array
@@ -28,8 +31,7 @@ class AuthService
             $userType = 'freelancer';
         }
 
-        $mypeProfileData = null;
-        $freelancerProfileData = null;
+        $profileData = $data;
 
         if ($userType === 'mype') {
             $mypeProfileData = $this->peruApiService->validateRuc($data['ruc']);
@@ -39,35 +41,41 @@ class AuthService
                     'ruc' => [$mypeProfileData['message']],
                 ]);
             }
-        } elseif ($userType === 'freelancer') {
-            $freelancerProfileData = [
-                'dni' => $data['dni'],
-                'experience_area' => $data['experience_area'] ?? 'No especificada',
-            ];
+
+            $profileData = array_merge($profileData, [
+                'business_name' => $mypeProfileData['business_name'],
+                'ruc' => $mypeProfileData['ruc'],
+                'location' => $mypeProfileData['location'] ?? null,
+            ]);
         }
 
-        $user = DB::transaction(function () use ($data, $userType, $mypeProfileData, $freelancerProfileData): User {
+        if ($userType === 'freelancer') {
+            $profileData = array_merge($profileData, [
+                'dni' => $data['dni'],
+                'experience_area' => $data['experience_area'] ?? 'No especificada',
+            ]);
+        }
+
+        $user = DB::transaction(function () use ($profileData, $userType): User {
             $user = $this->authRepository->createUser([
-                'name' => $this->resolveName($data),
-                'email' => strtolower($data['email']),
-                'password' => $data['password'],
+                'name' => $this->resolveName($profileData, $userType),
+                'email' => strtolower($profileData['email']),
+                'password' => $profileData['password'],
                 'user_type' => $userType,
             ]);
 
-            if ($mypeProfileData !== null) {
-                $user->mypeProfile()->create([
-                    'business_name' => $mypeProfileData['business_name'],
-                    'ruc' => $mypeProfileData['ruc'],
-                    'location' => $mypeProfileData['location'],
-                ]);
+            if ($userType === 'freelancer') {
+                $this->authRepository->createFreelancerProfile($user, $profileData);
             }
 
-            if ($freelancerProfileData !== null) {
-                $user->freelancerProfile()->create($freelancerProfileData);
+            if ($userType === 'mype') {
+                $this->authRepository->createMypeProfile($user, $profileData);
             }
 
             return $user;
         });
+
+        Mail::to($user->email)->send(new WelcomeAccountMail($user, $this->frontendUrl()));
 
         return $this->authenticatedPayload($user);
     }
@@ -83,9 +91,28 @@ class AuthService
         return $this->authenticatedPayload($user);
     }
 
-    public function sendPasswordResetLink(string $email): void
+    public function sendPasswordResetLink(string $email): bool
     {
-        Password::sendResetLink(['email' => $email]);
+        $status = Password::sendResetLink(['email' => $email]);
+
+        return $status === Password::RESET_LINK_SENT;
+    }
+
+    public function resetPassword(array $data): bool
+    {
+        $status = Password::reset(
+            $data,
+            function (User $user, string $password): void {
+                $user->forceFill([
+                    'password' => $password,
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        return $status === Password::PASSWORD_RESET;
     }
 
     public function logout(User $user, ?string $plainToken): void
@@ -105,6 +132,9 @@ class AuthService
             'user' => [
                 'id' => $freshUser->id,
                 'name' => $freshUser->name,
+                'first_name' => null,
+                'last_name' => null,
+                'company_name' => $freshUser->mypeProfile?->business_name,
                 'email' => $freshUser->email,
                 'user_type' => $freshUser->user_type,
                 'account_type' => $freshUser->user_type,
@@ -131,18 +161,27 @@ class AuthService
         return $payload;
     }
 
-    private function resolveName(array $data): string
+    private function resolveName(array $data, string $userType): string
     {
+        if ($userType === 'mype' && ! empty($data['business_name'])) {
+            return trim($data['business_name']);
+        }
+
         if (! empty($data['name'])) {
             return trim($data['name']);
         }
 
-        $name = trim(($data['first_name'] ?? '').' '.($data['last_name'] ?? ''));
+        $name = trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? ''));
 
         if ($name !== '') {
             return $name;
         }
 
         return strtolower($data['email']);
+    }
+
+    private function frontendUrl(): string
+    {
+        return rtrim((string) config('app.frontend_url', config('app.url')), '/');
     }
 }
