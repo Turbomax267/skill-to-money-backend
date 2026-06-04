@@ -7,6 +7,69 @@ use Throwable;
 
 class PeruApiService
 {
+    public function lookupDni(string $dni): array
+    {
+        $apiKey = config('services.peru_api.key');
+
+        if (empty($apiKey)) {
+            return [
+                'valid' => false,
+                'message' => 'No se configuró la API Key de Peru API.',
+            ];
+        }
+
+        try {
+            $response = Http::baseUrl((string) config('services.peru_api.base_url'))
+                ->timeout((int) config('services.peru_api.timeout', 8))
+                ->acceptJson()
+                ->withHeaders(['X-API-KEY' => $apiKey])
+                ->get('/api/dni/'.$dni);
+        } catch (Throwable) {
+            return [
+                'valid' => false,
+                'message' => 'No se pudo consultar el DNI. Intente nuevamente.',
+            ];
+        }
+
+        if ($response->status() === 404) {
+            return [
+                'valid' => false,
+                'message' => 'El DNI no existe en RENIEC.',
+            ];
+        }
+
+        if ($response->status() === 401) {
+            return [
+                'valid' => false,
+                'message' => 'No se pudo consultar el DNI por credenciales inválidas.',
+            ];
+        }
+
+        if (!$response->successful()) {
+            return [
+                'valid' => false,
+                'message' => 'No se pudo consultar el DNI. Intente nuevamente.',
+            ];
+        }
+
+        $data = $response->json();
+
+        if (($data['code'] ?? null) !== '200' || empty($data['nombres'])) {
+            return [
+                'valid' => false,
+                'message' => 'El DNI no existe o no tiene datos válidos en RENIEC.',
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'dni' => $data['dni'] ?? $dni,
+            'first_name' => $data['nombres'],
+            'last_name' => trim(($data['apellido_paterno'] ?? '') . ' ' . ($data['apellido_materno'] ?? '')),
+            'full_name' => $data['nombre_completo'] ?? null,
+        ];
+    }
+
     public function validateRuc(string $ruc): array
     {
         $apiKey = config('services.peru_api.key');
