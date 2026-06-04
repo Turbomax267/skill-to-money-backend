@@ -31,7 +31,7 @@ class BackendFoundationTest extends TestCase
             'first_name' => 'Camila',
             'last_name' => 'Rojas',
             'dni' => '12345678',
-            'email' => 'camila@example.com',
+            'email' => 'camila@gmail.com',
             'password' => 'password123',
         ]);
 
@@ -89,7 +89,7 @@ class BackendFoundationTest extends TestCase
             'first_name' => 'Camila',
             'last_name' => 'Rojas',
             'dni' => '12ABC678',
-            'email' => 'camila@example.com',
+            'email' => 'camila@gmail.com',
             'password' => 'password123',
         ])
             ->assertUnprocessable()
@@ -99,8 +99,7 @@ class BackendFoundationTest extends TestCase
     public function test_register_mype_rejects_ruc_with_letters(): void
     {
         $this->postJson('/api/auth/register/mype', [
-            'first_name' => 'Lucia',
-            'last_name' => 'Torres',
+            'company_name' => 'Empresa Demo SAC',
             'ruc' => '20ABC123456',
             'email' => 'lucia@example.com',
             'password' => 'password123',
@@ -128,8 +127,6 @@ class BackendFoundationTest extends TestCase
         ]);
 
         $this->postJson('/api/auth/register/mype', [
-            'first_name' => 'Lucia',
-            'last_name' => 'Torres',
             'company_name' => 'Nombre editable ignorado',
             'ruc' => '20601234567',
             'email' => 'lucia@example.com',
