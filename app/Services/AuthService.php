@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Services;
 
@@ -11,13 +11,16 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
     private const USER_TYPES = ['admin', 'freelancer', 'mype'];
 
-    public function __construct(private readonly AuthRepository $authRepository)
-    {
+    public function __construct(
+        private readonly AuthRepository $authRepository,
+        private readonly PeruApiService $peruApiService,
+    ) {
     }
 
     public function register(array $data, ?string $forcedUserType = null): array
@@ -28,20 +31,45 @@ class AuthService
             $userType = 'freelancer';
         }
 
-        $user = DB::transaction(function () use ($data, $userType): User {
+        $profileData = $data;
+
+        if ($userType === 'mype') {
+            $mypeProfileData = $this->peruApiService->validateRuc($data['ruc']);
+
+            if (! $mypeProfileData['valid']) {
+                throw ValidationException::withMessages([
+                    'ruc' => [$mypeProfileData['message']],
+                ]);
+            }
+
+            $profileData = array_merge($profileData, [
+                'business_name' => $mypeProfileData['business_name'],
+                'ruc' => $mypeProfileData['ruc'],
+                'location' => $mypeProfileData['location'] ?? null,
+            ]);
+        }
+
+        if ($userType === 'freelancer') {
+            $profileData = array_merge($profileData, [
+                'dni' => $data['dni'],
+                'experience_area' => $data['experience_area'] ?? 'No especificada',
+            ]);
+        }
+
+        $user = DB::transaction(function () use ($profileData, $userType): User {
             $user = $this->authRepository->createUser([
-                'name' => $this->resolveName($data, $userType),
-                'email' => strtolower($data['email']),
-                'password' => $data['password'],
+                'name' => $this->resolveName($profileData, $userType),
+                'email' => strtolower($profileData['email']),
+                'password' => $profileData['password'],
                 'user_type' => $userType,
             ]);
 
             if ($userType === 'freelancer') {
-                $this->authRepository->createFreelancerProfile($user, $data);
+                $this->authRepository->createFreelancerProfile($user, $profileData);
             }
 
             if ($userType === 'mype') {
-                $this->authRepository->createMypeProfile($user, $data);
+                $this->authRepository->createMypeProfile($user, $profileData);
             }
 
             return $user;
@@ -97,7 +125,7 @@ class AuthService
         $token = $this->authRepository->createToken($user, 'auth');
         $freshUser = $user->fresh(['freelancerProfile', 'mypeProfile']);
 
-        return [
+        $payload = [
             'token_type' => 'Bearer',
             'access_token' => $token['token'],
             'expires_at' => $token['expires_at'],
@@ -112,6 +140,25 @@ class AuthService
                 'account_type' => $freshUser->user_type,
             ],
         ];
+
+        if ($freshUser->freelancerProfile !== null) {
+            $payload['freelancer_profile'] = [
+                'id' => $freshUser->freelancerProfile->id,
+                'dni' => $freshUser->freelancerProfile->dni,
+                'experience_area' => $freshUser->freelancerProfile->experience_area,
+            ];
+        }
+
+        if ($freshUser->mypeProfile !== null) {
+            $payload['mype_profile'] = [
+                'id' => $freshUser->mypeProfile->id,
+                'business_name' => $freshUser->mypeProfile->business_name,
+                'ruc' => $freshUser->mypeProfile->ruc,
+                'location' => $freshUser->mypeProfile->location,
+            ];
+        }
+
+        return $payload;
     }
 
     private function resolveName(array $data, string $userType): string
@@ -124,7 +171,7 @@ class AuthService
             return trim($data['name']);
         }
 
-        $name = trim(($data['first_name'] ?? '').' '.($data['last_name'] ?? ''));
+        $name = trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? ''));
 
         if ($name !== '') {
             return $name;

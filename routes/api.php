@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\MarketplaceController;
+use App\Http\Controllers\Api\PeruController;
 use App\Http\Controllers\Api\MessagingController;
 use App\Http\Controllers\Api\ProfilesController;
 use App\Http\Controllers\Api\RecommendationController;
@@ -11,6 +12,11 @@ use App\Http\Controllers\Api\UsersController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class);
+
+Route::prefix('peru')->group(function (): void {
+    Route::get('/dni/{dni}', [PeruController::class, 'dni']);
+    Route::get('/ruc/{ruc}', [PeruController::class, 'ruc']);
+});
 
 Route::prefix('auth')->group(function (): void {
     Route::post('/register', [AuthController::class, 'register']);
