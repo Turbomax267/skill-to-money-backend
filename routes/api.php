@@ -31,8 +31,24 @@ Route::prefix('auth')->group(function (): void {
 Route::middleware('auth.api')->group(function (): void {
     Route::get('/users', [UsersController::class, 'index']);
     Route::get('/profiles', [ProfilesController::class, 'index']);
+    Route::get('/profile', [ProfilesController::class, 'show']);
+    Route::put('/profile', [ProfilesController::class, 'update']);
+    Route::patch('/profile/description', [ProfilesController::class, 'updateDescription']);
+    Route::patch('/profile/social-links', [ProfilesController::class, 'updateSocialLinks']);
+    Route::patch('/profile/skills', [ProfilesController::class, 'updateSkills']);
+    Route::post('/profile/photo', [ProfilesController::class, 'updatePhoto']);
     Route::get('/catalog', [CatalogController::class, 'index']);
+    Route::get('/catalog/categories', [CatalogController::class, 'categories']);
     Route::get('/marketplace', [MarketplaceController::class, 'index']);
+    Route::get('/freelancer/services', [MarketplaceController::class, 'services']);
+    Route::post('/freelancer/services', [MarketplaceController::class, 'storeService']);
+    Route::put('/freelancer/services/{service}', [MarketplaceController::class, 'updateService']);
+    Route::delete('/freelancer/services/{service}', [MarketplaceController::class, 'deleteService']);
+    Route::get('/freelancer/portfolio', [MarketplaceController::class, 'portfolio']);
+    Route::post('/freelancer/portfolio', [MarketplaceController::class, 'storePortfolioProject']);
+    Route::post('/freelancer/portfolio/{portfolioProject}', [MarketplaceController::class, 'updatePortfolioProject']);
+    Route::put('/freelancer/portfolio/{portfolioProject}', [MarketplaceController::class, 'updatePortfolioProject']);
+    Route::delete('/freelancer/portfolio/{portfolioProject}', [MarketplaceController::class, 'deletePortfolioProject']);
     Route::get('/messaging', [MessagingController::class, 'index']);
     Route::get('/recommendations', [RecommendationController::class, 'index']);
 });

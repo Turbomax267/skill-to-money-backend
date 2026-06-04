@@ -19,7 +19,7 @@ class ResetPasswordRequest extends ApiRequest
         return [
             'token' => ['required', 'string'],
             'email' => ['required', 'email:rfc', 'exists:users,email'],
-            'password' => ['required', 'confirmed', Password::min(8)],
+            'password' => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
         ];
     }
 }
