@@ -22,6 +22,10 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+    ],
+
     'peru_api' => [
         'base_url' => env('PERU_API_BASE_URL', 'https://peruapi.com'),
         'key' => env('PERU_API_KEY'),

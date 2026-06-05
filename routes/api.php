@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\Api\GeminiController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\MarketplaceController;
 use App\Http\Controllers\Api\PeruController;
@@ -28,6 +29,7 @@ Route::prefix('auth')->group(function (): void {
 });
 
 Route::middleware('auth.api')->group(function (): void {
+    Route::post('/gemini/analyze', [GeminiController::class, 'analyze']);
     Route::get('/users', [UsersController::class, 'index']);
     Route::get('/profiles', [ProfilesController::class, 'index']);
     Route::get('/catalog', [CatalogController::class, 'index']);
