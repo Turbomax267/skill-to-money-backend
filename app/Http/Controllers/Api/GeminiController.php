@@ -39,6 +39,22 @@ class GeminiController extends Controller
             return $this->error($result['message'], status: 422);
         }
 
-        return $this->success('Perfil analizado exitosamente.', $result['data']);
+        $analysis = $result['data'];
+        $user = $request->user();
+
+        if ($user && $user->freelancerProfile) {
+            $user->freelancerProfile->update([
+                'headline' => $analysis['headline'] ?? null,
+                'category' => $analysis['category'] ?? null,
+                'suggested_rate' => $analysis['suggested_rate'] ?? null,
+                'bio' => $analysis['bio'] ?? $user->freelancerProfile->bio,
+                'gemini_analysis' => [
+                    'suggested_projects' => $analysis['suggested_projects'] ?? [],
+                    'tips' => $analysis['tips'] ?? [],
+                ],
+            ]);
+        }
+
+        return $this->success('Perfil analizado y actualizado exitosamente.', $analysis);
     }
 }
