@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\Api\FavoritesController;
 use App\Http\Controllers\Api\GeminiController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\MarketplaceController;
@@ -30,9 +31,16 @@ Route::prefix('auth')->group(function (): void {
 
 Route::middleware('auth.api')->group(function (): void {
     Route::post('/gemini/analyze', [GeminiController::class, 'analyze']);
+
+    Route::get('/catalog', [CatalogController::class, 'index']);
+    Route::get('/catalog/{id}', [CatalogController::class, 'show']);
+
+    Route::get('/favorites', [FavoritesController::class, 'index']);
+    Route::post('/favorites', [FavoritesController::class, 'store']);
+    Route::delete('/favorites/{freelancerProfileId}', [FavoritesController::class, 'destroy']);
+
     Route::get('/users', [UsersController::class, 'index']);
     Route::get('/profiles', [ProfilesController::class, 'index']);
-    Route::get('/catalog', [CatalogController::class, 'index']);
     Route::get('/marketplace', [MarketplaceController::class, 'index']);
     Route::get('/messaging', [MessagingController::class, 'index']);
     Route::get('/recommendations', [RecommendationController::class, 'index']);
