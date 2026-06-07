@@ -245,6 +245,8 @@ class BackendFoundationTest extends TestCase
 
     public function test_mype_can_filter_catalog_and_manage_favorite_freelancers(): void
     {
+        config(['services.peru_api.key' => 'fake-key']);
+
         Http::fake([
             'https://peruapi.com/api/ruc/20601234567*' => Http::response([
                 'ruc' => '20601234567',
@@ -314,7 +316,7 @@ class BackendFoundationTest extends TestCase
 
         $mypeToken = $mype->json('data.access_token');
 
-        $this->withToken($mypeToken)->getJson('/api/catalog?search=video&category=Edicion%20de%20Video&location=Lima&min_rate=30&max_rate=40')
+        $this->withToken($mypeToken)->getJson('/api/catalog?search=video&category=Edicion%20de%20Video&location=Lima&min_rate=30&max_rate=40&min_rating=4')
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.total', 1)
@@ -345,8 +347,86 @@ class BackendFoundationTest extends TestCase
             ->assertJsonCount(0, 'data.favorites');
     }
 
+    public function test_mype_receives_recommended_freelancers_by_need(): void
+    {
+        config(['services.peru_api.key' => 'fake-key']);
+
+        Http::fake([
+            'https://peruapi.com/api/ruc/20603334445*' => Http::response([
+                'ruc' => '20603334445',
+                'razon_social' => 'RECOMENDACIONES MYPE S.A.C.',
+                'estado' => 'ACTIVO',
+                'condicion' => 'HABIDO',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'SURCO',
+                'mensaje' => 'OK',
+                'code' => '200',
+            ]),
+        ]);
+
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Valeria',
+            'last_name' => 'Lopez',
+            'dni' => '44112233',
+            'email' => 'valeria.reco@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $recommended = User::where('email', 'valeria.reco@gmail.com')
+            ->firstOrFail()
+            ->freelancerProfile;
+
+        $recommended->update([
+            'headline' => 'Especialista en reels para MYPEs',
+            'category' => 'Edicion de Video',
+            'bio' => 'Creo reels promocionales para restaurantes y negocios locales.',
+            'suggested_rate' => 'S/ 45',
+            'rating' => 4.9,
+            'completed_jobs' => 15,
+            'availability_status' => 'available',
+        ]);
+
+        $skill = Skill::create(['name' => 'Edicion de videos']);
+        $recommended->skills()->attach($skill->id);
+
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Bruno',
+            'last_name' => 'Diaz',
+            'dni' => '77441122',
+            'email' => 'bruno.reco@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        User::where('email', 'bruno.reco@gmail.com')
+            ->firstOrFail()
+            ->freelancerProfile
+            ->update([
+                'headline' => 'Desarrollador backend',
+                'category' => 'Desarrollo Web',
+                'suggested_rate' => 'S/ 120',
+                'rating' => 4.2,
+            ]);
+
+        $mype = $this->postJson('/api/auth/register/mype', [
+            'company_name' => 'Recomendaciones MYPE',
+            'ruc' => '20603334445',
+            'email' => 'recomendaciones.mype@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $this->withToken($mype->json('data.access_token'))->getJson('/api/recommendations?type=freelancer&search=reels%20restaurante&category=Edicion%20de%20Video&skill=videos&max_rate=60&min_rating=4.5')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.recommendations.0.id', $recommended->id)
+            ->assertJsonPath('data.recommendations.0.score', 100)
+            ->assertJsonPath('data.recommendations.0.reasons.0', 'Coincide con la categoria solicitada.');
+    }
+
     public function test_mype_can_explore_published_freelancer_services_with_filters(): void
     {
+        config(['services.peru_api.key' => 'fake-key']);
+
         Http::fake([
             'https://peruapi.com/api/ruc/20607654321*' => Http::response([
                 'ruc' => '20607654321',

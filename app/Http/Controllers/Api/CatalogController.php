@@ -23,6 +23,7 @@ class CatalogController extends Controller
             'skill' => 'nullable|string|max:100',
             'min_rate' => 'nullable|numeric|min:0',
             'max_rate' => 'nullable|numeric|min:0',
+            'min_rating' => 'nullable|numeric|min:0|max:5',
             'sort' => 'nullable|in:latest,rating,jobs',
             'order' => 'nullable|in:asc,desc',
             'per_page' => 'nullable|integer|min:1|max:50',
@@ -54,6 +55,10 @@ class CatalogController extends Controller
 
         if ($skill = $validated['skill'] ?? null) {
             $query->whereHas('skills', fn($q) => $q->where('name', 'like', "%{$skill}%"));
+        }
+
+        if (isset($validated['min_rating'])) {
+            $query->where('rating', '>=', $validated['min_rating']);
         }
 
         $sortField = match ($validated['sort'] ?? null) {
