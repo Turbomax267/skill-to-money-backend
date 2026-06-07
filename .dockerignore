@@ -1,6 +1,9 @@
-.git
-.github
-node_modules
 vendor
+node_modules
+.git
+.gitignore
 .env
-storage/logs/*
+storage/logs
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views

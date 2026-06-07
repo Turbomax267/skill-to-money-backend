@@ -25,4 +25,4 @@ RUN mkdir -p storage/app/public \
 
 EXPOSE 80
 
-CMD php artisan migrate --force && php artisan config:cache && apache2-foreground
+CMD php artisan config:cache && apache2-foreground
