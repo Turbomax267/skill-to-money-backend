@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Mail\WelcomeAccountMail;
 use App\Models\Category;
 use App\Models\Service;
 use App\Models\Skill;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class BackendFoundationTest extends TestCase
@@ -27,11 +29,13 @@ class BackendFoundationTest extends TestCase
 
     public function test_register_login_module_status_and_logout_flow(): void
     {
+        Mail::fake();
+
         $register = $this->postJson('/api/auth/register/freelancer', [
             'first_name' => 'Camila',
             'last_name' => 'Rojas',
             'dni' => '12345678',
-            'email' => 'camila@example.com',
+            'email' => 'camila@gmail.com',
             'password' => 'password123',
         ]);
 
@@ -40,6 +44,8 @@ class BackendFoundationTest extends TestCase
             ->assertJsonPath('data.user.user_type', 'freelancer')
             ->assertJsonPath('data.user.account_type', 'freelancer')
             ->assertJsonPath('data.freelancer_profile.dni', '12345678');
+
+        Mail::assertSent(WelcomeAccountMail::class);
 
         $token = $register->json('data.access_token');
 
@@ -52,7 +58,7 @@ class BackendFoundationTest extends TestCase
             ->assertJsonPath('data.module', 'profiles');
 
         $this->postJson('/api/auth/login', [
-            'email' => 'camila@example.com',
+            'email' => 'camila@gmail.com',
             'password' => 'password123',
         ])->assertOk()
             ->assertJsonPath('success', true)
@@ -87,7 +93,7 @@ class BackendFoundationTest extends TestCase
             'first_name' => 'Camila',
             'last_name' => 'Rojas',
             'dni' => '12ABC678',
-            'email' => 'camila@example.com',
+            'email' => 'camila@gmail.com',
             'password' => 'password123',
         ])
             ->assertUnprocessable()
@@ -97,10 +103,9 @@ class BackendFoundationTest extends TestCase
     public function test_register_mype_rejects_ruc_with_letters(): void
     {
         $this->postJson('/api/auth/register/mype', [
-            'first_name' => 'Lucia',
-            'last_name' => 'Torres',
+            'company_name' => 'Empresa Demo SAC',
             'ruc' => '20ABC123456',
-            'email' => 'lucia@example.com',
+            'email' => 'lucia@gmail.com',
             'password' => 'password123',
         ])
             ->assertUnprocessable()
@@ -126,11 +131,9 @@ class BackendFoundationTest extends TestCase
         ]);
 
         $this->postJson('/api/auth/register/mype', [
-            'first_name' => 'Lucia',
-            'last_name' => 'Torres',
             'company_name' => 'Nombre editable ignorado',
             'ruc' => '20601234567',
-            'email' => 'lucia@example.com',
+            'email' => 'lucia.ruc@gmail.com',
             'password' => 'password123',
         ])
             ->assertCreated()
@@ -192,7 +195,7 @@ class BackendFoundationTest extends TestCase
             'first_name' => 'Camila',
             'last_name' => 'Rojas',
             'dni' => '87654321',
-            'email' => 'camila.gemini@example.com',
+            'email' => 'camila.gemini@gmail.com',
             'password' => 'password123',
         ]);
 
@@ -260,11 +263,11 @@ class BackendFoundationTest extends TestCase
             'first_name' => 'Camila',
             'last_name' => 'Rojas',
             'dni' => '11223344',
-            'email' => 'camila.catalog@example.com',
+            'email' => 'camila.catalog@gmail.com',
             'password' => 'password123',
         ])->assertCreated();
 
-        $freelancer = User::where('email', 'camila.catalog@example.com')
+        $freelancer = User::where('email', 'camila.catalog@gmail.com')
             ->firstOrFail()
             ->freelancerProfile;
 
@@ -286,11 +289,11 @@ class BackendFoundationTest extends TestCase
             'first_name' => 'Mateo',
             'last_name' => 'Quispe',
             'dni' => '55667788',
-            'email' => 'mateo.catalog@example.com',
+            'email' => 'mateo.catalog@gmail.com',
             'password' => 'password123',
         ])->assertCreated();
 
-        User::where('email', 'mateo.catalog@example.com')
+        User::where('email', 'mateo.catalog@gmail.com')
             ->firstOrFail()
             ->freelancerProfile
             ->update([
@@ -305,7 +308,7 @@ class BackendFoundationTest extends TestCase
             'last_name' => 'Torres',
             'company_name' => 'Cliente MYPE',
             'ruc' => '20601234567',
-            'email' => 'lucia.catalog@example.com',
+            'email' => 'lucia.catalog@gmail.com',
             'password' => 'password123',
         ])->assertCreated();
 
@@ -362,11 +365,11 @@ class BackendFoundationTest extends TestCase
             'first_name' => 'Diego',
             'last_name' => 'Salazar',
             'dni' => '99887766',
-            'email' => 'diego.services@example.com',
+            'email' => 'diego.services@gmail.com',
             'password' => 'password123',
         ])->assertCreated();
 
-        $freelancer = User::where('email', 'diego.services@example.com')
+        $freelancer = User::where('email', 'diego.services@gmail.com')
             ->firstOrFail()
             ->freelancerProfile;
 
@@ -406,7 +409,7 @@ class BackendFoundationTest extends TestCase
             'last_name' => 'Mendoza',
             'company_name' => 'Servicios Cliente',
             'ruc' => '20607654321',
-            'email' => 'rosa.services@example.com',
+            'email' => 'rosa.services@gmail.com',
             'password' => 'password123',
         ])->assertCreated();
 

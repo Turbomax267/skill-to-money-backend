@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use App\Models\Category;
 use App\Models\FreelancerProfile;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class CatalogController extends Controller
 {
@@ -97,30 +97,7 @@ class CatalogController extends Controller
             $freelancers = $query->paginate($perPage);
         }
 
-        $data = $freelancers->getCollection()->map(function (FreelancerProfile $profile) {
-            $user = $profile->user;
-
-            return [
-                'id' => $profile->id,
-                'user_id' => $profile->user_id,
-                'name' => $user?->name ?? 'Freelancer',
-                'first_name' => $this->extractFirstName($user?->name),
-                'dni' => $profile->dni,
-                'headline' => $profile->headline,
-                'category' => $profile->category,
-                'bio' => $profile->bio,
-                'suggested_rate' => $profile->suggested_rate,
-                'rate_amount' => $this->parseRate($profile->suggested_rate),
-                'location' => $profile->location,
-                'experience_area' => $profile->experience_area,
-                'rating' => $profile->rating,
-                'completed_jobs' => $profile->completed_jobs,
-                'profile_photo' => $profile->profile_photo,
-                'skills' => $profile->skills->pluck('name'),
-                'availability_status' => $profile->availability_status,
-                'created_at' => $profile->created_at,
-            ];
-        });
+        $data = $freelancers->getCollection()->map(fn(FreelancerProfile $profile) => $this->formatFreelancer($profile));
 
         return $this->success('Freelancers encontrados.', [
             'freelancers' => $data,
@@ -129,6 +106,16 @@ class CatalogController extends Controller
             'current_page' => $freelancers->currentPage(),
             'last_page' => $freelancers->lastPage(),
         ]);
+    }
+
+    public function categories(): JsonResponse
+    {
+        $categories = Category::query()
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name', 'description', 'status']);
+
+        return $this->success('Categories loaded.', $categories);
     }
 
     public function show(int $id): JsonResponse
@@ -141,12 +128,30 @@ class CatalogController extends Controller
             return $this->error('Freelancer no encontrado.', status: 404);
         }
 
+        return $this->success('Freelancer encontrado.', [
+            ...$this->formatFreelancer($profile),
+            'website' => $profile->website,
+            'social_links' => $profile->social_links,
+            'portfolio' => $profile->portfolioProjects->map(fn($p) => [
+                'id' => $p->id,
+                'title' => $p->title,
+                'description' => $p->description,
+                'image_path' => $p->image_path,
+                'external_url' => $p->external_url,
+            ]),
+        ]);
+    }
+
+    private function formatFreelancer(FreelancerProfile $profile): array
+    {
         $user = $profile->user;
 
-        return $this->success('Freelancer encontrado.', [
+        return [
             'id' => $profile->id,
             'user_id' => $profile->user_id,
             'name' => $user?->name ?? 'Freelancer',
+            'first_name' => $this->extractFirstName($user?->name),
+            'dni' => $profile->dni,
             'headline' => $profile->headline,
             'category' => $profile->category,
             'bio' => $profile->bio,
@@ -157,18 +162,10 @@ class CatalogController extends Controller
             'rating' => $profile->rating,
             'completed_jobs' => $profile->completed_jobs,
             'profile_photo' => $profile->profile_photo,
-            'website' => $profile->website,
-            'social_links' => $profile->social_links,
-            'availability_status' => $profile->availability_status,
             'skills' => $profile->skills->pluck('name'),
-            'portfolio' => $profile->portfolioProjects->map(fn($p) => [
-                'id' => $p->id,
-                'title' => $p->title,
-                'description' => $p->description,
-                'image_path' => $p->image_path,
-                'external_url' => $p->external_url,
-            ]),
-        ]);
+            'availability_status' => $profile->availability_status,
+            'created_at' => $profile->created_at,
+        ];
     }
 
     private function extractFirstName(?string $name): ?string

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Responses\ApiResponse;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
@@ -53,9 +54,24 @@ class AuthController extends Controller
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        $this->authService->sendPasswordResetLink($request->validated('email'));
+        $sent = $this->authService->sendPasswordResetLink($request->validated('email'));
 
-        return $this->success('If the email exists, a recovery link will be sent.');
+        if (! $sent) {
+            return $this->error('No se pudo enviar el enlace de recuperacion.', ['email' => ['Intentalo nuevamente.']], 500);
+        }
+
+        return $this->success('Te enviamos un enlace para recuperar tu contrasena.');
+    }
+
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    {
+        $reset = $this->authService->resetPassword($request->validated());
+
+        if (! $reset) {
+            return $this->error('El enlace de recuperacion no es valido o expiro.', ['token' => ['Token invalido.']], 422);
+        }
+
+        return $this->success('Contrasena actualizada correctamente.');
     }
 
     public function logout(Request $request): JsonResponse
