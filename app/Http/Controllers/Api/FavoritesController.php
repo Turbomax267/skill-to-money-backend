@@ -92,12 +92,27 @@ class FavoritesController extends Controller
             'category' => $profile->category,
             'bio' => $profile->bio,
             'suggested_rate' => $profile->suggested_rate,
+            'rate_amount' => $this->parseRate($profile->suggested_rate),
             'location' => $profile->location,
             'experience_area' => $profile->experience_area,
             'rating' => $profile->rating,
             'completed_jobs' => $profile->completed_jobs,
             'profile_photo' => $profile->profile_photo,
             'skills' => $profile->skills->pluck('name'),
+            'availability_status' => $profile->availability_status,
         ];
+    }
+
+    private function parseRate(?string $rate): ?float
+    {
+        if ($rate === null) {
+            return null;
+        }
+
+        if (!preg_match('/\d+(?:[.,]\d+)?/', $rate, $matches)) {
+            return null;
+        }
+
+        return (float) str_replace(',', '.', $matches[0]);
     }
 }

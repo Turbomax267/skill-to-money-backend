@@ -7,6 +7,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\FreelancerProfile;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 
 class CatalogController extends Controller
@@ -15,13 +16,27 @@ class CatalogController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'search' => 'nullable|string|max:120',
+            'category' => 'nullable|string|max:100',
+            'location' => 'nullable|string|max:100',
+            'skill' => 'nullable|string|max:100',
+            'min_rate' => 'nullable|numeric|min:0',
+            'max_rate' => 'nullable|numeric|min:0',
+            'sort' => 'nullable|in:latest,rating,jobs',
+            'order' => 'nullable|in:asc,desc',
+            'per_page' => 'nullable|integer|min:1|max:50',
+            'page' => 'nullable|integer|min:1',
+        ]);
+
         $query = FreelancerProfile::query()
             ->with(['user', 'skills'])
             ->whereHas('user', fn($q) => $q->where('user_type', 'freelancer'));
 
-        if ($search = $request->input('search')) {
+        if ($search = $validated['search'] ?? null) {
             $query->where(function ($q) use ($search): void {
                 $q->where('headline', 'like', "%{$search}%")
+                    ->orWhere('category', 'like', "%{$search}%")
                     ->orWhere('bio', 'like', "%{$search}%")
                     ->orWhere('location', 'like', "%{$search}%")
                     ->orWhereHas('user', fn($uq) => $uq->where('name', 'like', "%{$search}%"))
@@ -29,38 +44,60 @@ class CatalogController extends Controller
             });
         }
 
-        if ($category = $request->input('category')) {
-            $query->where('category', $category);
+        if ($category = $validated['category'] ?? null) {
+            $query->where('category', 'like', "%{$category}%");
         }
 
-        if ($location = $request->input('location')) {
+        if ($location = $validated['location'] ?? null) {
             $query->where('location', 'like', "%{$location}%");
         }
 
-        if ($skill = $request->input('skill')) {
+        if ($skill = $validated['skill'] ?? null) {
             $query->whereHas('skills', fn($q) => $q->where('name', 'like', "%{$skill}%"));
         }
 
-        if ($minRate = $request->input('min_rate')) {
-            $query->where('suggested_rate', '>=', $minRate);
-        }
-
-        if ($maxRate = $request->input('max_rate')) {
-            $query->where('suggested_rate', '<=', $maxRate);
-        }
-
-        $sortField = match ($request->input('sort')) {
+        $sortField = match ($validated['sort'] ?? null) {
             'rating' => 'rating',
             'jobs' => 'completed_jobs',
             default => 'created_at',
         };
-        $sortDir = $request->input('order', 'desc') === 'asc' ? 'asc' : 'desc';
+        $sortDir = ($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortField, $sortDir);
 
-        $perPage = min((int) $request->input('per_page', 12), 50);
-        $freelancers = $query->paginate($perPage);
+        $perPage = (int) ($validated['per_page'] ?? 12);
+        $minRate = $validated['min_rate'] ?? null;
+        $maxRate = $validated['max_rate'] ?? null;
 
-        $data = $freelancers->map(function (FreelancerProfile $profile) {
+        if ($minRate !== null || $maxRate !== null) {
+            $profiles = $query->get()
+                ->filter(function (FreelancerProfile $profile) use ($minRate, $maxRate): bool {
+                    $rate = $this->parseRate($profile->suggested_rate);
+
+                    if ($rate === null) {
+                        return false;
+                    }
+
+                    if ($minRate !== null && $rate < (float) $minRate) {
+                        return false;
+                    }
+
+                    return !($maxRate !== null && $rate > (float) $maxRate);
+                })
+                ->values();
+
+            $page = LengthAwarePaginator::resolveCurrentPage();
+            $freelancers = new LengthAwarePaginator(
+                $profiles->forPage($page, $perPage)->values(),
+                $profiles->count(),
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()],
+            );
+        } else {
+            $freelancers = $query->paginate($perPage);
+        }
+
+        $data = $freelancers->getCollection()->map(function (FreelancerProfile $profile) {
             $user = $profile->user;
 
             return [
@@ -73,6 +110,7 @@ class CatalogController extends Controller
                 'category' => $profile->category,
                 'bio' => $profile->bio,
                 'suggested_rate' => $profile->suggested_rate,
+                'rate_amount' => $this->parseRate($profile->suggested_rate),
                 'location' => $profile->location,
                 'experience_area' => $profile->experience_area,
                 'rating' => $profile->rating,
@@ -113,6 +151,7 @@ class CatalogController extends Controller
             'category' => $profile->category,
             'bio' => $profile->bio,
             'suggested_rate' => $profile->suggested_rate,
+            'rate_amount' => $this->parseRate($profile->suggested_rate),
             'location' => $profile->location,
             'experience_area' => $profile->experience_area,
             'rating' => $profile->rating,
@@ -139,5 +178,18 @@ class CatalogController extends Controller
         }
 
         return explode(' ', $name)[0];
+    }
+
+    private function parseRate(?string $rate): ?float
+    {
+        if ($rate === null) {
+            return null;
+        }
+
+        if (!preg_match('/\d+(?:[.,]\d+)?/', $rate, $matches)) {
+            return null;
+        }
+
+        return (float) str_replace(',', '.', $matches[0]);
     }
 }

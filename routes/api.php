@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\PeruController;
 use App\Http\Controllers\Api\MessagingController;
 use App\Http\Controllers\Api\ProfilesController;
 use App\Http\Controllers\Api\RecommendationController;
+use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\UsersController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,9 @@ Route::middleware('auth.api')->group(function (): void {
 
     Route::get('/catalog', [CatalogController::class, 'index']);
     Route::get('/catalog/{id}', [CatalogController::class, 'show']);
+
+    Route::get('/services', [ServicesController::class, 'index']);
+    Route::get('/services/{id}', [ServicesController::class, 'show']);
 
     Route::get('/favorites', [FavoritesController::class, 'index']);
     Route::post('/favorites', [FavoritesController::class, 'store']);
