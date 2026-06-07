@@ -28,7 +28,7 @@ class ServicesController extends Controller
 
         $query = Service::query()
             ->with(['freelancer.user', 'freelancer.skills', 'category'])
-            ->where('status', 'published')
+            ->whereIn('status', ['active', 'published'])
             ->whereHas('freelancer.user', fn($q) => $q->where('user_type', 'freelancer'));
 
         if ($search = $validated['search'] ?? null) {
@@ -80,7 +80,7 @@ class ServicesController extends Controller
     public function show(int $id): JsonResponse
     {
         $service = Service::with(['freelancer.user', 'freelancer.skills', 'category'])
-            ->where('status', 'published')
+            ->whereIn('status', ['active', 'published'])
             ->whereHas('freelancer.user', fn($q) => $q->where('user_type', 'freelancer'))
             ->find($id);
 
