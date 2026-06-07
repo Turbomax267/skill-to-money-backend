@@ -3,9 +3,13 @@
 namespace Tests\Feature;
 
 use App\Mail\WelcomeAccountMail;
+use App\Models\Category;
+use App\Models\Service;
+use App\Models\Skill;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class BackendFoundationTest extends TestCase
@@ -101,7 +105,7 @@ class BackendFoundationTest extends TestCase
         $this->postJson('/api/auth/register/mype', [
             'company_name' => 'Empresa Demo SAC',
             'ruc' => '20ABC123456',
-            'email' => 'lucia@example.com',
+            'email' => 'lucia@gmail.com',
             'password' => 'password123',
         ])
             ->assertUnprocessable()
@@ -129,7 +133,7 @@ class BackendFoundationTest extends TestCase
         $this->postJson('/api/auth/register/mype', [
             'company_name' => 'Nombre editable ignorado',
             'ruc' => '20601234567',
-            'email' => 'lucia@example.com',
+            'email' => 'lucia.ruc@gmail.com',
             'password' => 'password123',
         ])
             ->assertCreated()
@@ -142,5 +146,282 @@ class BackendFoundationTest extends TestCase
             'business_name' => 'SKILL TO MONEY S.A.C.',
             'ruc' => '20601234567',
         ]);
+    }
+
+    public function test_gemini_analysis_sends_full_freelancer_payload_and_updates_profile(): void
+    {
+        config(['services.gemini.key' => 'fake-gemini-key']);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                [
+                                    'text' => json_encode([
+                                        'headline' => 'Editor de video para marcas',
+                                        'category' => 'Edicion de Video',
+                                        'suggested_rate' => 'S/ 35',
+                                        'bio' => 'Creo videos claros para marcas que necesitan vender mejor en canales digitales.',
+                                        'profile_criteria' => [
+                                            'positioning' => 'Especialista en video corto para MYPEs.',
+                                            'target_clients' => ['MYPEs', 'Emprendedores digitales'],
+                                            'service_keywords' => ['video corto', 'edicion para redes'],
+                                            'portfolio_focus' => ['reels promocionales'],
+                                            'pricing_notes' => 'La tarifa considera herramientas y experiencia inicial.',
+                                        ],
+                                        'suggested_projects' => [
+                                            [
+                                                'title' => 'Video promocional para negocio local',
+                                                'description' => 'Pieza breve para redes sociales.',
+                                                'estimated_time' => '12 horas',
+                                                'tasks' => ['Guion', 'Edicion', 'Exportacion'],
+                                            ],
+                                        ],
+                                        'tips' => ['Agrega muestras antes y despues.'],
+                                        'strengths' => ['Edicion con enfoque comercial'],
+                                        'availability_summary' => 'Puede invertir 10 horas por semana.',
+                                    ]),
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $register = $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Camila',
+            'last_name' => 'Rojas',
+            'dni' => '87654321',
+            'email' => 'camila.gemini@gmail.com',
+            'password' => 'password123',
+        ]);
+
+        $token = $register->json('data.access_token');
+
+        $this->withToken($token)->postJson('/api/gemini/analyze', [
+            'skills' => ['Edicion de videos', 'Diseno de branding'],
+            'tools' => ['Photoshop', 'CapCut'],
+            'description' => 'Me gusta crear piezas visuales para negocios que quieren crecer en redes.',
+            'areas' => ['Comunicacion'],
+            'certificates' => ['Curso de Excel - Avanzado'],
+            'has_project_experience' => 'si',
+            'projects' => [
+                [
+                    'name' => 'Video para cafeteria',
+                    'description' => 'Video corto para promocionar un producto.',
+                    'time' => '15 horas',
+                ],
+            ],
+            'availability' => 'si',
+            'availability_time' => '10 horas por semana',
+            'freelance_goals' => 'Conseguir clientes MYPE.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.headline', 'Editor de video para marcas')
+            ->assertJsonPath('data.profile_criteria.service_keywords.0', 'video corto')
+            ->assertJsonPath('data.suggested_projects.0.tasks.1', 'Edicion');
+
+        $this->assertDatabaseHas('freelancer_profiles', [
+            'dni' => '87654321',
+            'headline' => 'Editor de video para marcas',
+            'category' => 'Edicion de Video',
+            'suggested_rate' => 'S/ 35',
+            'availability_status' => 'available',
+        ]);
+
+        Http::assertSent(function ($request): bool {
+            $body = $request->body();
+
+            return str_contains($body, '"responseMimeType":"application\/json"')
+                && str_contains($body, 'No hagas inferencias')
+                && str_contains($body, '10 horas por semana')
+                && str_contains($body, 'Video para cafeteria');
+        });
+    }
+
+    public function test_mype_can_filter_catalog_and_manage_favorite_freelancers(): void
+    {
+        Http::fake([
+            'https://peruapi.com/api/ruc/20601234567*' => Http::response([
+                'ruc' => '20601234567',
+                'razon_social' => 'CLIENTE MYPE S.A.C.',
+                'estado' => 'ACTIVO',
+                'condicion' => 'HABIDO',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'MIRAFLORES',
+                'mensaje' => 'OK',
+                'code' => '200',
+            ]),
+        ]);
+
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Camila',
+            'last_name' => 'Rojas',
+            'dni' => '11223344',
+            'email' => 'camila.catalog@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $freelancer = User::where('email', 'camila.catalog@gmail.com')
+            ->firstOrFail()
+            ->freelancerProfile;
+
+        $freelancer->update([
+            'headline' => 'Editora de video para redes',
+            'category' => 'Edicion de Video',
+            'bio' => 'Edicion de reels y piezas cortas para negocios locales.',
+            'suggested_rate' => 'S/ 35',
+            'location' => 'Lima',
+            'rating' => 4.8,
+            'completed_jobs' => 6,
+            'availability_status' => 'available',
+        ]);
+
+        $skill = Skill::create(['name' => 'Edicion de videos']);
+        $freelancer->skills()->attach($skill->id);
+
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Mateo',
+            'last_name' => 'Quispe',
+            'dni' => '55667788',
+            'email' => 'mateo.catalog@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        User::where('email', 'mateo.catalog@gmail.com')
+            ->firstOrFail()
+            ->freelancerProfile
+            ->update([
+                'headline' => 'Desarrollador web',
+                'category' => 'Desarrollo Web',
+                'suggested_rate' => 'S/ 90',
+                'location' => 'Arequipa',
+            ]);
+
+        $mype = $this->postJson('/api/auth/register/mype', [
+            'first_name' => 'Lucia',
+            'last_name' => 'Torres',
+            'company_name' => 'Cliente MYPE',
+            'ruc' => '20601234567',
+            'email' => 'lucia.catalog@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $mypeToken = $mype->json('data.access_token');
+
+        $this->withToken($mypeToken)->getJson('/api/catalog?search=video&category=Edicion%20de%20Video&location=Lima&min_rate=30&max_rate=40')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.total', 1)
+            ->assertJsonPath('data.freelancers.0.id', $freelancer->id)
+            ->assertJsonPath('data.freelancers.0.rate_amount', 35);
+
+        $this->withToken($mypeToken)->postJson('/api/favorites', [
+            'freelancer_profile_id' => $freelancer->id,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.favorite.id', $freelancer->id);
+
+        $this->withToken($mypeToken)->postJson('/api/favorites', [
+            'freelancer_profile_id' => $freelancer->id,
+        ])->assertStatus(409);
+
+        $this->withToken($mypeToken)->getJson('/api/favorites')
+            ->assertOk()
+            ->assertJsonPath('data.favorites.0.id', $freelancer->id)
+            ->assertJsonPath('data.favorites.0.availability_status', 'available');
+
+        $this->withToken($mypeToken)->deleteJson("/api/favorites/{$freelancer->id}")
+            ->assertOk();
+
+        $this->withToken($mypeToken)->getJson('/api/favorites')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.favorites');
+    }
+
+    public function test_mype_can_explore_published_freelancer_services_with_filters(): void
+    {
+        Http::fake([
+            'https://peruapi.com/api/ruc/20607654321*' => Http::response([
+                'ruc' => '20607654321',
+                'razon_social' => 'SERVICIOS CLIENTE S.A.C.',
+                'estado' => 'ACTIVO',
+                'condicion' => 'HABIDO',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'SAN ISIDRO',
+                'mensaje' => 'OK',
+                'code' => '200',
+            ]),
+        ]);
+
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Diego',
+            'last_name' => 'Salazar',
+            'dni' => '99887766',
+            'email' => 'diego.services@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $freelancer = User::where('email', 'diego.services@gmail.com')
+            ->firstOrFail()
+            ->freelancerProfile;
+
+        $freelancer->update([
+            'headline' => 'Editor de video para redes',
+            'rating' => 4.9,
+            'completed_jobs' => 12,
+        ]);
+
+        $category = Category::create(['name' => 'Edicion de Video']);
+        $otherCategory = Category::create(['name' => 'Desarrollo Web']);
+
+        Service::create([
+            'freelancer_profile_id' => $freelancer->id,
+            'category_id' => $category->id,
+            'title' => 'Edicion de 10 reels para redes sociales',
+            'description' => 'Incluye cortes, subtitulos y musica.',
+            'price' => 200,
+            'currency' => 'PEN',
+            'delivery_days' => 5,
+            'status' => 'published',
+        ]);
+
+        Service::create([
+            'freelancer_profile_id' => $freelancer->id,
+            'category_id' => $otherCategory->id,
+            'title' => 'Landing page para negocio local',
+            'description' => 'Pagina simple de aterrizaje.',
+            'price' => 700,
+            'currency' => 'PEN',
+            'delivery_days' => 10,
+            'status' => 'draft',
+        ]);
+
+        $mype = $this->postJson('/api/auth/register/mype', [
+            'first_name' => 'Rosa',
+            'last_name' => 'Mendoza',
+            'company_name' => 'Servicios Cliente',
+            'ruc' => '20607654321',
+            'email' => 'rosa.services@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $token = $mype->json('data.access_token');
+
+        $this->withToken($token)->getJson('/api/services?search=reels&category=Video&min_price=150&max_price=250&max_delivery_days=7')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.total', 1)
+            ->assertJsonPath('data.services.0.title', 'Edicion de 10 reels para redes sociales')
+            ->assertJsonPath('data.services.0.price', 200)
+            ->assertJsonPath('data.services.0.freelancer.name', 'Diego Salazar')
+            ->assertJsonPath('data.services.0.freelancer.rating', '4.90');
     }
 }

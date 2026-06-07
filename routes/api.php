@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\Api\FavoritesController;
+use App\Http\Controllers\Api\GeminiController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\MarketplaceController;
 use App\Http\Controllers\Api\PeruController;
 use App\Http\Controllers\Api\MessagingController;
 use App\Http\Controllers\Api\ProfilesController;
 use App\Http\Controllers\Api\RecommendationController;
+use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\UsersController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +32,19 @@ Route::prefix('auth')->group(function (): void {
 });
 
 Route::middleware('auth.api')->group(function (): void {
+    Route::post('/gemini/analyze', [GeminiController::class, 'analyze']);
+
+    Route::get('/catalog/categories', [CatalogController::class, 'categories']);
+    Route::get('/catalog', [CatalogController::class, 'index']);
+    Route::get('/catalog/{id}', [CatalogController::class, 'show']);
+
+    Route::get('/services', [ServicesController::class, 'index']);
+    Route::get('/services/{id}', [ServicesController::class, 'show']);
+
+    Route::get('/favorites', [FavoritesController::class, 'index']);
+    Route::post('/favorites', [FavoritesController::class, 'store']);
+    Route::delete('/favorites/{freelancerProfileId}', [FavoritesController::class, 'destroy']);
+
     Route::get('/users', [UsersController::class, 'index']);
     Route::get('/profiles', [ProfilesController::class, 'index']);
     Route::get('/profile', [ProfilesController::class, 'show']);
@@ -37,8 +53,6 @@ Route::middleware('auth.api')->group(function (): void {
     Route::patch('/profile/social-links', [ProfilesController::class, 'updateSocialLinks']);
     Route::patch('/profile/skills', [ProfilesController::class, 'updateSkills']);
     Route::post('/profile/photo', [ProfilesController::class, 'updatePhoto']);
-    Route::get('/catalog', [CatalogController::class, 'index']);
-    Route::get('/catalog/categories', [CatalogController::class, 'categories']);
     Route::get('/marketplace', [MarketplaceController::class, 'index']);
     Route::get('/freelancer/services', [MarketplaceController::class, 'services']);
     Route::post('/freelancer/services', [MarketplaceController::class, 'storeService']);

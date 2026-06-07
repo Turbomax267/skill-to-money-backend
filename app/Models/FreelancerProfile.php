@@ -14,6 +14,10 @@ class FreelancerProfile extends Model
         'dni',
         'experience_area',
         'bio',
+        'headline',
+        'category',
+        'suggested_rate',
+        'gemini_analysis',
         'profile_photo',
         'location',
         'contact_phone',
@@ -29,6 +33,7 @@ class FreelancerProfile extends Model
     {
         return [
             'social_links' => 'array',
+            'gemini_analysis' => 'array',
             'rating' => 'decimal:2',
             'completed_jobs' => 'integer',
             'visibility_score' => 'decimal:2',
