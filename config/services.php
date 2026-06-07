@@ -31,6 +31,7 @@ return [
         'base_url' => env('PERU_API_BASE_URL', 'https://peruapi.com'),
         'key' => env('PERU_API_KEY'),
         'timeout' => env('PERU_API_TIMEOUT', 8),
+        'fallback_url' => env('PERU_API_FALLBACK_URL'),
     ],
 
     'ses' => [

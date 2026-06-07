@@ -89,6 +89,33 @@ API local:
 http://127.0.0.1:8000
 ```
 
+## Setup con Docker
+
+Este repositorio puede levantarse de forma independiente con Docker.
+
+Pasos:
+
+1. Copiar `.env.example` a `.env`
+2. Completar en ese `.env` las credenciales reales de PostgreSQL Render, Resend y Peru API
+3. Construir la imagen:
+
+```bash
+docker build -t skill-to-money-backend .
+```
+
+4. Levantar el contenedor:
+
+```bash
+docker run --env-file .env -p 8000:80 skill-to-money-backend
+```
+
+URLs:
+
+```txt
+Backend: http://localhost:8000
+Health: http://localhost:8000/api/health
+```
+
 ## Variables de entorno
 
 Variables clave para Render:
@@ -147,7 +174,7 @@ Si se despliega con Docker, Render usa el `Dockerfile`.
 El contenedor ejecuta:
 
 ```bash
-php artisan migrate --force && php artisan config:cache && apache2-foreground
+php artisan config:cache && apache2-foreground
 ```
 
 Health checks:

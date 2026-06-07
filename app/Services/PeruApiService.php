@@ -14,7 +14,7 @@ class PeruApiService
         if (empty($apiKey)) {
             return [
                 'valid' => false,
-                'message' => 'No se configuró la API Key de Peru API.',
+                'message' => 'No se configuro la API Key de Peru API.',
             ];
         }
 
@@ -39,13 +39,19 @@ class PeruApiService
         }
 
         if ($response->status() === 401) {
+            $fallback = $this->lookupDniFromFallback($dni);
+
+            if ($fallback !== null) {
+                return $fallback;
+            }
+
             return [
                 'valid' => false,
-                'message' => 'No se pudo consultar el DNI por credenciales inválidas.',
+                'message' => 'No se pudo consultar el DNI por credenciales invalidas.',
             ];
         }
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             return [
                 'valid' => false,
                 'message' => 'No se pudo consultar el DNI. Intente nuevamente.',
@@ -57,7 +63,7 @@ class PeruApiService
         if (($data['code'] ?? null) !== '200' || empty($data['nombres'])) {
             return [
                 'valid' => false,
-                'message' => 'El DNI no existe o no tiene datos válidos en RENIEC.',
+                'message' => 'El DNI no existe o no tiene datos validos en RENIEC.',
             ];
         }
 
@@ -65,7 +71,7 @@ class PeruApiService
             'valid' => true,
             'dni' => $data['dni'] ?? $dni,
             'first_name' => $data['nombres'],
-            'last_name' => trim(($data['apellido_paterno'] ?? '') . ' ' . ($data['apellido_materno'] ?? '')),
+            'last_name' => trim(($data['apellido_paterno'] ?? '').' '.($data['apellido_materno'] ?? '')),
             'full_name' => $data['nombre_completo'] ?? null,
         ];
     }
@@ -105,6 +111,12 @@ class PeruApiService
         }
 
         if ($response->status() === 401) {
+            $fallback = $this->lookupRucFromFallback($ruc);
+
+            if ($fallback !== null) {
+                return $fallback;
+            }
+
             return [
                 'valid' => false,
                 'message' => 'No se pudo validar el RUC por credenciales invalidas.',
@@ -145,6 +157,75 @@ class PeruApiService
             'condition' => $condicion,
             'location' => $this->resolveLocation($data),
         ];
+    }
+
+    private function lookupDniFromFallback(string $dni): ?array
+    {
+        $data = $this->fetchFallback('/dni/'.$dni);
+
+        if ($data === null) {
+            return null;
+        }
+
+        return [
+            'valid' => true,
+            'dni' => $data['dni'] ?? $dni,
+            'first_name' => $data['first_name'] ?? '',
+            'last_name' => $data['last_name'] ?? '',
+            'full_name' => $data['full_name'] ?? null,
+        ];
+    }
+
+    private function lookupRucFromFallback(string $ruc): ?array
+    {
+        $data = $this->fetchFallback('/ruc/'.$ruc);
+
+        if ($data === null) {
+            return null;
+        }
+
+        return [
+            'valid' => true,
+            'ruc' => $data['ruc'] ?? $ruc,
+            'business_name' => $data['business_name'] ?? '',
+            'state' => $data['state'] ?? '',
+            'condition' => $data['condition'] ?? '',
+            'location' => $data['location'] ?? null,
+        ];
+    }
+
+    private function fetchFallback(string $path): ?array
+    {
+        if (! app()->environment('local')) {
+            return null;
+        }
+
+        $fallbackUrl = config('services.peru_api.fallback_url');
+
+        if (empty($fallbackUrl)) {
+            return null;
+        }
+
+        try {
+            $response = Http::baseUrl((string) $fallbackUrl)
+                ->timeout((int) config('services.peru_api.timeout', 8))
+                ->acceptJson()
+                ->get($path);
+        } catch (Throwable) {
+            return null;
+        }
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $payload = $response->json();
+
+        if (($payload['success'] ?? false) !== true || empty($payload['data']) || ! is_array($payload['data'])) {
+            return null;
+        }
+
+        return $payload['data'];
     }
 
     private function resolveLocation(array $data): ?string
