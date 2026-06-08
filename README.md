@@ -167,6 +167,27 @@ Notas:
 - Ya no es necesario usar `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` ni `MAIL_SCHEME` cuando `MAIL_MAILER=resend`.
 - Para produccion, lo ideal es verificar un dominio propio en Resend y reemplazar `onboarding@resend.dev` por un remitente de tu dominio.
 
+## Correo con Gmail via Google Apps Script
+
+Si el backend corre en Render free y necesitas enviar desde una cuenta Gmail sin usar SMTP, puedes usar un webhook de Google Apps Script.
+
+Variables necesarias:
+
+```env
+MAIL_MAILER=google_apps_script
+MAIL_FROM_ADDRESS=skill.to.money.262@gmail.com
+MAIL_FROM_NAME="Skill To Money"
+GOOGLE_MAIL_WEBHOOK_URL=https://script.google.com/macros/s/TU_WEBAPP/exec
+GOOGLE_MAIL_WEBHOOK_SECRET=tu_secreto_compartido
+GOOGLE_MAIL_WEBHOOK_TIMEOUT=15
+```
+
+Con este modo:
+
+- el correo de bienvenida y el de recuperacion de contrasena se envian por HTTPS al webhook
+- Render no necesita salida SMTP
+- el webhook es quien finalmente manda el correo desde Gmail
+
 ## Render
 
 Si se despliega con Docker, Render usa el `Dockerfile`.

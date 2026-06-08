@@ -208,7 +208,9 @@ class PeruApiService
 
         try {
             $response = Http::baseUrl((string) $fallbackUrl)
-                ->timeout((int) config('services.peru_api.timeout', 8))
+                ->retry(2, 1500)
+                ->connectTimeout(10)
+                ->timeout(max((int) config('services.peru_api.timeout', 8), 20))
                 ->acceptJson()
                 ->get($path);
         } catch (Throwable) {
