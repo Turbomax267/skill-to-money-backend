@@ -22,6 +22,12 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    'google_apps_script' => [
+        'webhook_url' => env('GOOGLE_MAIL_WEBHOOK_URL'),
+        'webhook_secret' => env('GOOGLE_MAIL_WEBHOOK_SECRET'),
+        'timeout' => env('GOOGLE_MAIL_WEBHOOK_TIMEOUT', 15),
+    ],
+
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
         'timeout' => env('GEMINI_API_TIMEOUT', 20),

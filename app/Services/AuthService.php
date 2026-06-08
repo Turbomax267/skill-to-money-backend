@@ -2,13 +2,11 @@
 
 namespace App\Services;
 
-use App\Mail\WelcomeAccountMail;
 use App\Models\User;
 use App\Repositories\AuthRepository;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -20,6 +18,7 @@ class AuthService
     public function __construct(
         private readonly AuthRepository $authRepository,
         private readonly PeruApiService $peruApiService,
+        private readonly WebhookMailService $webhookMailService,
     ) {
     }
 
@@ -75,7 +74,7 @@ class AuthService
             return $user;
         });
 
-        Mail::to($user->email)->send(new WelcomeAccountMail($user, $this->frontendUrl()));
+        $this->webhookMailService->sendWelcomeMail($user, $this->frontendUrl());
 
         return $this->authenticatedPayload($user);
     }
@@ -93,6 +92,22 @@ class AuthService
 
     public function sendPasswordResetLink(string $email): bool
     {
+        if ($this->webhookMailService->shouldUseWebhookMailer()) {
+            $user = $this->authRepository->findUserByEmail($email);
+
+            if ($user === null) {
+                return false;
+            }
+
+            $token = Password::broker()->createToken($user);
+            $frontendUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+            $url = $frontendUrl.'/reset-password?token='.urlencode($token).'&email='.urlencode($user->email);
+
+            $this->webhookMailService->sendPasswordResetMail($user, $url);
+
+            return true;
+        }
+
         $status = Password::sendResetLink(['email' => $email]);
 
         return $status === Password::RESET_LINK_SENT;
