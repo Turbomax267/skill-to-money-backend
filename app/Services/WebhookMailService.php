@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Mail\WelcomeAccountMail;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
 use RuntimeException;
@@ -77,6 +78,14 @@ class WebhookMailService
             ]);
 
         if (! $response->successful()) {
+            Log::error('Google Apps Script mail webhook failed.', [
+                'status' => $response->status(),
+                'response_body' => $response->body(),
+                'to' => $to,
+                'subject' => $subject,
+                'mailer' => config('mail.default'),
+            ]);
+
             throw new RuntimeException('No se pudo enviar el correo mediante Google Apps Script.');
         }
     }
