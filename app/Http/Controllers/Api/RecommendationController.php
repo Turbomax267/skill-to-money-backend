@@ -7,6 +7,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\FreelancerProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class RecommendationController extends Controller
 {
@@ -130,6 +131,7 @@ class RecommendationController extends Controller
             'rating' => $profile->rating,
             'completed_jobs' => $profile->completed_jobs,
             'profile_photo' => $profile->profile_photo,
+            'photo_url' => $this->storageUrl($profile->profile_photo),
             'skills' => $skills,
             'availability_status' => $profile->availability_status,
             'score' => min(100, $score),
@@ -154,6 +156,15 @@ class RecommendationController extends Controller
     private function normalize(string $value): string
     {
         return strtolower(trim($value));
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 
     private function parseRate(?string $rate): ?float

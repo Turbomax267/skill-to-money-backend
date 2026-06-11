@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FavoritesController;
 use App\Http\Controllers\Api\GeminiController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\MarketplaceController;
+use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\PeruController;
 use App\Http\Controllers\Api\MessagingController;
 use App\Http\Controllers\Api\ProfilesController;
@@ -20,6 +21,9 @@ Route::prefix('peru')->group(function (): void {
     Route::get('/dni/{dni}', [PeruController::class, 'dni']);
     Route::get('/ruc/{ruc}', [PeruController::class, 'ruc']);
 });
+
+Route::get('/media/{path}', [MediaController::class, 'show'])
+    ->where('path', '.*');
 
 Route::prefix('auth')->group(function (): void {
     Route::post('/register', [AuthController::class, 'register']);

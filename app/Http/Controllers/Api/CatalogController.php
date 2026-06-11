@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Category;
 use App\Models\FreelancerProfile;
+use App\Models\PortfolioProject;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Storage;
 
 class CatalogController extends Controller
 {
@@ -125,7 +127,7 @@ class CatalogController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $profile = FreelancerProfile::with(['user', 'skills', 'portfolioProjects'])
+        $profile = FreelancerProfile::with(['user', 'skills', 'portfolioProjects.category'])
             ->whereHas('user', fn($q) => $q->where('user_type', 'freelancer'))
             ->find($id);
 
@@ -137,13 +139,22 @@ class CatalogController extends Controller
             ...$this->formatFreelancer($profile),
             'website' => $profile->website,
             'social_links' => $profile->social_links,
-            'portfolio' => $profile->portfolioProjects->map(fn($p) => [
-                'id' => $p->id,
-                'title' => $p->title,
-                'description' => $p->description,
-                'image_path' => $p->image_path,
-                'external_url' => $p->external_url,
-            ]),
+            'portfolio' => $profile->portfolioProjects
+                ->sortBy(['category.name', 'project_order', 'created_at'])
+                ->values()
+                ->map(fn(PortfolioProject $project) => [
+                    'id' => $project->id,
+                    'category_id' => $project->category_id,
+                    'category' => $project->category?->name,
+                    'title' => $project->title,
+                    'description' => $project->description,
+                    'image_path' => $project->image_path,
+                    'image_url' => $this->storageUrl($project->image_path),
+                    'external_url' => $project->external_url,
+                    'project_order' => $project->project_order,
+                    'is_featured' => $project->is_featured,
+                    'created_at' => optional($project->created_at)->toIso8601String(),
+                ]),
         ]);
     }
 
@@ -167,10 +178,20 @@ class CatalogController extends Controller
             'rating' => $profile->rating,
             'completed_jobs' => $profile->completed_jobs,
             'profile_photo' => $profile->profile_photo,
+            'photo_url' => $this->storageUrl($profile->profile_photo),
             'skills' => $profile->skills->pluck('name'),
             'availability_status' => $profile->availability_status,
             'created_at' => $profile->created_at,
         ];
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 
     private function extractFirstName(?string $name): ?string

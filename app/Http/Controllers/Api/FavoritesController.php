@@ -8,6 +8,7 @@ use App\Models\Favorite;
 use App\Models\FreelancerProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class FavoritesController extends Controller
 {
@@ -98,9 +99,19 @@ class FavoritesController extends Controller
             'rating' => $profile->rating,
             'completed_jobs' => $profile->completed_jobs,
             'profile_photo' => $profile->profile_photo,
+            'photo_url' => $this->storageUrl($profile->profile_photo),
             'skills' => $profile->skills->pluck('name'),
             'availability_status' => $profile->availability_status,
         ];
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 
     private function parseRate(?string $rate): ?float

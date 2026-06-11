@@ -7,6 +7,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Service;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ServicesController extends Controller
 {
@@ -116,9 +117,19 @@ class ServicesController extends Controller
                 'rating' => $freelancer?->rating,
                 'completed_jobs' => $freelancer?->completed_jobs,
                 'profile_photo' => $freelancer?->profile_photo,
+                'photo_url' => $this->storageUrl($freelancer?->profile_photo),
                 'skills' => $freelancer?->skills->pluck('name')->values() ?? [],
             ],
             'created_at' => $service->created_at,
         ];
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 }
