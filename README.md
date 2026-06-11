@@ -116,6 +116,49 @@ Backend: http://localhost:8000
 Health: http://localhost:8000/api/health
 ```
 
+## Docker para desarrollo diario
+
+Si quieres trabajar sin borrar contenedores ni reconstruir la imagen por cada cambio, usa el modo dev:
+
+Primera vez:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+Uso diario:
+
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+
+Detener:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+Con este modo:
+
+- el codigo local se monta dentro del contenedor
+- los cambios en `app`, `routes`, `config` y demas archivos del backend se reflejan sin rebuild
+- `vendor` queda persistido en un volumen Docker
+- no se ejecutan migraciones automaticamente
+
+Solo reconstruye si cambias:
+
+- `composer.json`
+- `composer.lock`
+- `Dockerfile`
+- extensiones PHP o configuracion base del contenedor
+
+Si cambias dependencias y quieres reinstalarlas:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.dev.yml up --build
+```
+
 ## Variables de entorno
 
 Variables clave para Render:
@@ -126,6 +169,7 @@ APP_DEBUG=false
 APP_URL=https://your-render-service.onrender.com
 FRONTEND_URL=https://your-lovable-app.lovable.app
 CORS_ALLOWED_ORIGINS=https://your-lovable-app.lovable.app,http://localhost:5173
+PUBLIC_DISK_ROOT=/var/data/skill-to-money-public
 
 DB_CONNECTION=pgsql
 DB_HOST=your-render-postgres-host
@@ -140,6 +184,34 @@ MAIL_FROM_ADDRESS=onboarding@resend.dev
 MAIL_FROM_NAME="Skill To Money"
 RESEND_API_KEY=re_xxxxxxxxx
 ```
+
+## Almacenamiento persistente para imagenes
+
+Las imagenes del portafolio y de perfil no se guardan dentro de la base de datos. La base solo guarda la ruta, y el archivo real se almacena en el disco `public`.
+
+Ruta usada por defecto:
+
+```txt
+storage/app/public
+```
+
+Si quieres que en produccion las imagenes no se pierdan al hacer redeploy, configura un disco persistente en Render y define:
+
+```env
+PUBLIC_DISK_ROOT=/var/data/skill-to-money-public
+```
+
+Con eso:
+
+- las imagenes nuevas se guardaran en el disco persistente
+- el backend servira esos archivos por la ruta `GET /api/media/{path}`
+- el contenedor ya no dependera de que el archivo exista dentro de su filesystem efimero
+
+Importante:
+
+- `portfolio_projects.image_path` guarda solo rutas como `portfolio/images/archivo.png`
+- la imagen real debe existir dentro de `PUBLIC_DISK_ROOT/portfolio/images`
+- si la base tiene la ruta pero el archivo no existe en ese disco, la imagen no se podra mostrar
 
 No subir `.env` real al repositorio.
 
