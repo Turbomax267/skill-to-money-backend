@@ -52,6 +52,7 @@ Route::middleware('auth.api')->group(function (): void {
     Route::get('/users', [UsersController::class, 'index']);
     Route::get('/profiles', [ProfilesController::class, 'index']);
     Route::get('/profile', [ProfilesController::class, 'show']);
+    Route::get('/profile/skill-options', [ProfilesController::class, 'skillOptions']);
     Route::put('/profile', [ProfilesController::class, 'update']);
     Route::patch('/profile/description', [ProfilesController::class, 'updateDescription']);
     Route::patch('/profile/social-links', [ProfilesController::class, 'updateSocialLinks']);
