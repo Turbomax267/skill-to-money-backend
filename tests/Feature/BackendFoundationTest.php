@@ -148,9 +148,13 @@ class BackendFoundationTest extends TestCase
         ]);
     }
 
-    public function test_gemini_analysis_sends_full_freelancer_payload_and_updates_profile(): void
+    public function test_gemini_analysis_sends_compact_safe_payload_and_updates_profile(): void
     {
-        config(['services.gemini.key' => 'fake-gemini-key']);
+        config([
+            'services.gemini.key' => 'fake-gemini-key',
+            'services.openrouter.key' => null,
+            'services.groq.key' => null,
+        ]);
 
         Http::fake([
             'https://generativelanguage.googleapis.com/*' => Http::response([
@@ -160,28 +164,29 @@ class BackendFoundationTest extends TestCase
                             'parts' => [
                                 [
                                     'text' => json_encode([
-                                        'headline' => 'Editor de video para marcas',
-                                        'category' => 'Edicion de Video',
-                                        'suggested_rate' => 'S/ 35',
-                                        'bio' => 'Creo videos claros para marcas que necesitan vender mejor en canales digitales.',
-                                        'profile_criteria' => [
-                                            'positioning' => 'Especialista en video corto para MYPEs.',
-                                            'target_clients' => ['MYPEs', 'Emprendedores digitales'],
-                                            'service_keywords' => ['video corto', 'edicion para redes'],
-                                            'portfolio_focus' => ['reels promocionales'],
-                                            'pricing_notes' => 'La tarifa considera herramientas y experiencia inicial.',
-                                        ],
-                                        'suggested_projects' => [
+                                        'titulo_profesional' => 'Editor de video para marcas',
+                                        'descripcion_profesional' => 'Creo videos claros para marcas que necesitan vender mejor en canales digitales.',
+                                        'propuesta_valor' => 'Ayudo a MYPEs a comunicar mejor sus productos con videos cortos y claros.',
+                                        'skills_destacadas' => ['video corto', 'edicion para redes'],
+                                        'herramientas_destacadas' => ['CapCut', 'Photoshop'],
+                                        'proyectos_optimizados' => [
                                             [
-                                                'title' => 'Video promocional para negocio local',
-                                                'description' => 'Pieza breve para redes sociales.',
-                                                'estimated_time' => '12 horas',
-                                                'tasks' => ['Guion', 'Edicion', 'Exportacion'],
+                                                'nombre' => 'Video promocional para negocio local',
+                                                'descripcion_mejorada' => 'Pieza breve para redes sociales orientada a presentar un producto.',
+                                                'categoria' => 'Edicion de Video',
+                                                'herramientas' => ['CapCut'],
                                             ],
                                         ],
-                                        'tips' => ['Agrega muestras antes y despues.'],
-                                        'strengths' => ['Edicion con enfoque comercial'],
-                                        'availability_summary' => 'Puede invertir 10 horas por semana.',
+                                        'servicios_recomendados' => [
+                                            [
+                                                'nombre' => 'Edicion de reels para redes',
+                                                'descripcion' => 'Edicion de videos cortos con cortes limpios y subtitulos.',
+                                                'precio_sugerido' => 'S/ 35 por hora',
+                                                'tiempo_entrega' => '2 a 3 dias',
+                                                'categoria' => 'Edicion de Video',
+                                            ],
+                                        ],
+                                        'recomendaciones_mejora' => ['Agrega muestras antes y despues.'],
                                     ]),
                                 ],
                             ],
@@ -213,6 +218,8 @@ class BackendFoundationTest extends TestCase
                     'name' => 'Video para cafeteria',
                     'description' => 'Video corto para promocionar un producto.',
                     'time' => '15 horas',
+                    'tools' => ['CapCut'],
+                    'category' => 'Edicion de Video',
                 ],
             ],
             'availability' => 'si',
@@ -221,26 +228,208 @@ class BackendFoundationTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.titulo_profesional', 'Editor de video para marcas')
+            ->assertJsonPath('data.servicios_recomendados.0.precio_sugerido', 'S/ 35 por hora')
             ->assertJsonPath('data.headline', 'Editor de video para marcas')
             ->assertJsonPath('data.profile_criteria.service_keywords.0', 'video corto')
-            ->assertJsonPath('data.suggested_projects.0.tasks.1', 'Edicion');
+            ->assertJsonPath('data.suggested_projects.0.title', 'Video promocional para negocio local');
 
         $this->assertDatabaseHas('freelancer_profiles', [
             'dni' => '87654321',
             'headline' => 'Editor de video para marcas',
             'category' => 'Edicion de Video',
-            'suggested_rate' => 'S/ 35',
+            'experience_area' => 'Edicion de Video',
+            'suggested_rate' => 'S/ 35 por hora',
             'availability_status' => 'available',
+        ]);
+
+        $this->assertDatabaseHas('skills', ['name' => 'video corto']);
+        $this->assertDatabaseHas('skills', ['name' => 'Photoshop']);
+        $this->assertDatabaseHas('services', [
+            'title' => 'Edicion de reels para redes',
+            'price' => 35,
+            'currency' => 'PEN',
+            'delivery_days' => 3,
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('portfolio_projects', [
+            'title' => 'Video promocional para negocio local',
+            'is_featured' => true,
         ]);
 
         Http::assertSent(function ($request): bool {
             $body = $request->body();
 
             return str_contains($body, '"responseMimeType":"application\/json"')
-                && str_contains($body, 'No hagas inferencias')
+                && str_contains($body, '"maxOutputTokens":1000')
+                && str_contains($body, 'Eres un asesor experto en freelancing')
+                && str_contains($body, 'No inventes experiencia')
                 && str_contains($body, '10 horas por semana')
-                && str_contains($body, 'Video para cafeteria');
+                && str_contains($body, 'Video para cafeteria')
+                && !str_contains($body, '87654321')
+                && !str_contains($body, 'Camila')
+                && !str_contains($body, 'Rojas')
+                && !str_contains($body, 'password123')
+                && !str_contains($body, 'linkedin')
+                && !str_contains($body, 'instagram');
         });
+    }
+
+    public function test_gemini_analysis_uses_openrouter_backup_when_gemini_rate_limits(): void
+    {
+        config([
+            'services.gemini.key' => 'fake-gemini-key',
+            'services.openrouter.key' => 'fake-openrouter-key',
+            'services.openrouter.model' => 'google/gemini-2.5-flash-lite',
+            'services.groq.key' => null,
+        ]);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response([
+                'error' => [
+                    'code' => 429,
+                    'message' => 'Quota exceeded',
+                ],
+            ], 429),
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'titulo_profesional' => 'Diseñadora de branding para negocios locales',
+                                'descripcion_profesional' => 'Creo piezas visuales claras para negocios que empiezan a vender en redes.',
+                                'propuesta_valor' => 'Ayudo a ordenar la imagen de negocios locales con diseños simples y consistentes.',
+                                'skills_destacadas' => ['branding', 'diseño para redes'],
+                                'herramientas_destacadas' => ['Canva', 'Photoshop'],
+                                'proyectos_optimizados' => [
+                                    [
+                                        'nombre' => 'Identidad visual para tienda',
+                                        'descripcion_mejorada' => 'Paquete visual basico para presentar mejor una tienda local.',
+                                        'categoria' => 'Diseño de branding',
+                                        'herramientas' => ['Canva'],
+                                    ],
+                                ],
+                                'servicios_recomendados' => [
+                                    [
+                                        'nombre' => 'Kit visual para redes',
+                                        'descripcion' => 'Diseño de piezas base para publicar productos o promociones.',
+                                        'precio_sugerido' => 'S/ 150 por proyecto',
+                                        'tiempo_entrega' => '5 dias',
+                                        'categoria' => 'Diseño de branding',
+                                    ],
+                                ],
+                                'recomendaciones_mejora' => ['Incluye ejemplos antes y despues.'],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $register = $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Ana',
+            'last_name' => 'Lopez',
+            'dni' => '45678912',
+            'email' => 'ana.openrouter@gmail.com',
+            'password' => 'password123',
+        ]);
+
+        $this->withToken($register->json('data.access_token'))->postJson('/api/gemini/analyze', [
+            'skills' => ['Branding'],
+            'tools' => ['Canva', 'Photoshop'],
+            'description' => 'Quiero crear piezas visuales para negocios locales que venden en redes.',
+            'projects' => [
+                [
+                    'name' => 'Identidad visual para tienda',
+                    'description' => 'Propuesta de logo y colores para una tienda local.',
+                    'tools' => ['Canva'],
+                    'category' => 'Diseño de branding',
+                ],
+            ],
+            'availability' => 'si',
+            'availability_time' => '12 horas por semana',
+        ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('message', 'Gemini no estuvo disponible. Perfil generado con OpenRouter.')
+            ->assertJsonPath('data.titulo_profesional', 'Diseñadora de branding para negocios locales')
+            ->assertJsonPath('data.servicios_recomendados.0.precio_sugerido', 'S/ 150 por proyecto');
+
+        $profile = User::where('email', 'ana.openrouter@gmail.com')->firstOrFail()->freelancerProfile;
+
+        $this->assertSame('openrouter', $profile->gemini_analysis['source'] ?? null);
+        $this->assertDatabaseHas('services', [
+            'title' => 'Kit visual para redes',
+            'price' => 150,
+            'delivery_days' => 5,
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('portfolio_projects', [
+            'title' => 'Identidad visual para tienda',
+        ]);
+        Http::assertSentCount(2);
+        Http::assertSent(function ($request): bool {
+            $body = json_decode($request->body(), true);
+
+            return str_contains($request->url(), 'openrouter.ai')
+                && ($body['max_tokens'] ?? null) === 1000
+                && ($body['model'] ?? null) === 'google/gemini-2.5-flash-lite'
+                && ($body['messages'][0]['content'] ?? null) === 'Responde unicamente en JSON valido.';
+        });
+    }
+
+    public function test_gemini_analysis_returns_error_when_all_ai_providers_fail(): void
+    {
+        config([
+            'services.gemini.key' => 'fake-gemini-key',
+            'services.openrouter.key' => null,
+            'services.groq.key' => null,
+            'services.ai.local_fallback_enabled' => false,
+        ]);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response([
+                'error' => [
+                    'code' => 429,
+                    'message' => 'Quota exceeded',
+                ],
+            ], 429),
+        ]);
+
+        $register = $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Lucia',
+            'last_name' => 'Perez',
+            'dni' => '12349876',
+            'email' => 'lucia.gemini429@gmail.com',
+            'password' => 'password123',
+        ]);
+
+        $this->withToken($register->json('data.access_token'))->postJson('/api/gemini/analyze', [
+            'skills' => ['Diseno de branding'],
+            'tools' => ['Canva'],
+            'description' => 'Quiero crear piezas visuales simples para negocios locales.',
+            'projects' => [
+                [
+                    'name' => 'Identidad visual para tienda',
+                    'description' => 'Propuesta de logo y piezas base para una tienda local.',
+                    'tools' => ['Canva'],
+                    'category' => 'Diseno de branding',
+                ],
+            ],
+            'availability' => 'si',
+            'availability_time' => '8 horas por semana',
+        ])
+            ->assertStatus(503)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'No se pudo generar el perfil con IA. Gemini/OpenRouter/Groq no respondieron correctamente. Revisa cuota o API keys e intenta otra vez.');
+
+        $profile = User::where('email', 'lucia.gemini429@gmail.com')->firstOrFail()->freelancerProfile;
+
+        $this->assertNull($profile->gemini_analysis);
+        $this->assertDatabaseMissing('services', ['title' => 'Servicio inicial de Diseno de branding']);
+        $this->assertDatabaseMissing('portfolio_projects', ['title' => 'Identidad visual para tienda']);
+
+        Http::assertSentCount(1);
     }
 
     public function test_mype_can_filter_catalog_and_manage_favorite_freelancers(): void

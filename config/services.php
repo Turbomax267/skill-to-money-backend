@@ -33,6 +33,24 @@ return [
         'timeout' => env('GEMINI_API_TIMEOUT', 20),
     ],
 
+    'openrouter' => [
+        'key' => env('OPENROUTER_API_KEY'),
+        'model' => env('OPENROUTER_MODEL', 'google/gemini-2.5-flash-lite'),
+        'timeout' => env('OPENROUTER_API_TIMEOUT', 20),
+        'referer' => env('OPENROUTER_HTTP_REFERER'),
+        'title' => env('OPENROUTER_APP_TITLE', 'SkillToMoney'),
+    ],
+
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'llama-3.1-8b-instant'),
+        'timeout' => env('GROQ_API_TIMEOUT', 20),
+    ],
+
+    'ai' => [
+        'local_fallback_enabled' => env('AI_LOCAL_FALLBACK_ENABLED', false),
+    ],
+
     'peru_api' => [
         'base_url' => env('PERU_API_BASE_URL', 'https://peruapi.com'),
         'key' => env('PERU_API_KEY'),

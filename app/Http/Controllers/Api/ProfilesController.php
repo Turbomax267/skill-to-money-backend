@@ -172,7 +172,12 @@ class ProfilesController extends Controller
 
     private function profilePayload(Request $request): array
     {
-        $user = $request->user()->fresh(['freelancerProfile.skills', 'mypeProfile']);
+        $user = $request->user()->fresh([
+            'freelancerProfile.skills',
+            'freelancerProfile.services',
+            'freelancerProfile.portfolioProjects',
+            'mypeProfile',
+        ]);
 
         if ($user->user_type === 'mype') {
             $profile = $user->mypeProfile;
@@ -198,6 +203,9 @@ class ProfilesController extends Controller
             'user_id' => $user->id,
             'dni' => $profile?->dni,
             'experience_area' => $profile?->experience_area,
+            'headline' => $profile?->headline,
+            'category' => $profile?->category,
+            'suggested_rate' => $profile?->suggested_rate,
             'bio' => $profile?->bio,
             'description' => $profile?->bio,
             'location' => $profile?->location,
@@ -210,6 +218,9 @@ class ProfilesController extends Controller
             'visibility_score' => $profile?->visibility_score,
             'profile_photo' => $profile?->profile_photo,
             'photo_url' => $this->storageUrl($profile?->profile_photo),
+            'gemini_analysis' => $profile?->gemini_analysis,
+            'services_count' => $profile?->services->count() ?? 0,
+            'portfolio_projects_count' => $profile?->portfolioProjects->count() ?? 0,
             'skills' => $profile?->skills->pluck('name')->values()->all() ?? [],
             'skill_items' => $profile?->skills
                 ->map(fn (Skill $skill): array => [
