@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use App\Models\ClientProject;
 use App\Models\FreelancerProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ class RecommendationController extends Controller
     {
         $validated = $request->validate([
             'type' => 'nullable|in:freelancer',
+            'project_id' => 'nullable|integer|exists:client_projects,id',
             'search' => 'nullable|string|max:120',
             'category' => 'nullable|string|max:100',
             'skill' => 'nullable|string|max:100',
@@ -24,6 +26,17 @@ class RecommendationController extends Controller
             'min_rating' => 'nullable|numeric|min:0|max:5',
             'limit' => 'nullable|integer|min:1|max:10',
         ]);
+
+        if (isset($validated['project_id'])) {
+            $project = ClientProject::query()->findOrFail($validated['project_id']);
+
+            if ($request->user()->mypeProfile?->id !== $project->mype_profile_id) {
+                return $this->error('Client project not found.', ['project' => ['Proyecto no encontrado.']], 404);
+            }
+
+            $validated['search'] = trim($project->title . ' ' . $project->description);
+            $validated['category'] = $project->category ?? ($validated['category'] ?? null);
+        }
 
         $limit = (int) ($validated['limit'] ?? 6);
         $profiles = FreelancerProfile::query()

@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\FavoritesController;
 use App\Http\Controllers\Api\GeminiController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\MarketplaceController;
+use App\Http\Controllers\Api\MarketInsightController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\PeruController;
 use App\Http\Controllers\Api\MessagingController;
@@ -50,6 +51,9 @@ Route::middleware('auth.api')->group(function (): void {
     Route::post('/client/projects', [ClientProjectController::class, 'store']);
     Route::put('/client/projects/{clientProject}', [ClientProjectController::class, 'update']);
     Route::delete('/client/projects/{clientProject}', [ClientProjectController::class, 'destroy']);
+
+    Route::get('/market/trends', [MarketInsightController::class, 'trends']);
+    Route::get('/market/price-suggestion', [MarketInsightController::class, 'priceSuggestion']);
 
     Route::get('/favorites', [FavoritesController::class, 'index']);
     Route::post('/favorites', [FavoritesController::class, 'store']);
