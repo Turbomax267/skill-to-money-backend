@@ -7,6 +7,8 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Category;
 use App\Models\FreelancerProfile;
 use App\Models\PortfolioProject;
+use App\Models\Service;
+use App\Services\ViewCounter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -125,9 +127,9 @@ class CatalogController extends Controller
         return $this->success('Categories loaded.', $categories);
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id, ViewCounter $views): JsonResponse
     {
-        $profile = FreelancerProfile::with(['user', 'skills', 'portfolioProjects.category'])
+        $profile = FreelancerProfile::with(['user', 'skills', 'portfolioProjects.category', 'services.category'])
             ->whereHas('user', fn($q) => $q->where('user_type', 'freelancer'))
             ->find($id);
 
@@ -135,10 +137,27 @@ class CatalogController extends Controller
             return $this->error('Freelancer no encontrado.', status: 404);
         }
 
+        $views->track($request, $profile, 'freelancer_profile');
+
         return $this->success('Freelancer encontrado.', [
             ...$this->formatFreelancer($profile),
             'website' => $profile->website,
             'social_links' => $profile->social_links,
+            'views_count' => $profile->views_count,
+            'services' => $profile->services
+                ->whereIn('status', ['active', 'published'])
+                ->values()
+                ->map(fn(Service $service) => [
+                    'id' => $service->id,
+                    'title' => $service->title,
+                    'description' => $service->description,
+                    'price' => (float) $service->price,
+                    'currency' => $service->currency,
+                    'delivery_days' => $service->delivery_days,
+                    'status' => $service->status,
+                    'views_count' => $service->views_count,
+                    'category' => $service->category?->name,
+                ]),
             'portfolio' => $profile->portfolioProjects
                 ->sortBy(['category.name', 'project_order', 'created_at'])
                 ->values()
@@ -181,6 +200,7 @@ class CatalogController extends Controller
             'photo_url' => $this->storageUrl($profile->profile_photo),
             'skills' => $profile->skills->pluck('name'),
             'availability_status' => $profile->availability_status,
+            'views_count' => $profile->views_count,
             'created_at' => $profile->created_at,
         ];
     }

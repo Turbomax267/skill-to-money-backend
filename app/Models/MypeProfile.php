@@ -17,6 +17,7 @@ class MypeProfile extends Model
         'website',
         'location',
         'profile_photo',
+        'views_count',
     ];
 
     public function user(): BelongsTo
@@ -27,6 +28,13 @@ class MypeProfile extends Model
     public function favorites(): HasMany
     {
         return $this->hasMany(Favorite::class);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'views_count' => 'integer',
+        ];
     }
 
     public function clientProjects(): HasMany

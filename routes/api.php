@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\MarketInsightController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\PeruController;
 use App\Http\Controllers\Api\MessagingController;
+use App\Http\Controllers\Api\MypeController;
 use App\Http\Controllers\Api\ProfilesController;
 use App\Http\Controllers\Api\RecommendationController;
 use App\Http\Controllers\Api\ServicesController;
@@ -49,8 +50,10 @@ Route::middleware('auth.api')->group(function (): void {
 
     Route::get('/client/projects', [ClientProjectController::class, 'index']);
     Route::post('/client/projects', [ClientProjectController::class, 'store']);
+    Route::get('/client-projects/{clientProject}', [ClientProjectController::class, 'publicShow']);
     Route::put('/client/projects/{clientProject}', [ClientProjectController::class, 'update']);
     Route::delete('/client/projects/{clientProject}', [ClientProjectController::class, 'destroy']);
+    Route::get('/mypes/{mypeProfile}', [MypeController::class, 'show']);
 
     Route::get('/market/trends', [MarketInsightController::class, 'trends']);
     Route::get('/market/price-suggestion', [MarketInsightController::class, 'priceSuggestion']);

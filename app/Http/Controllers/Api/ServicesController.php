@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Service;
+use App\Services\ViewCounter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -78,7 +79,7 @@ class ServicesController extends Controller
         ]);
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id, ViewCounter $views): JsonResponse
     {
         $service = Service::with(['freelancer.user', 'freelancer.skills', 'category'])
             ->whereIn('status', ['active', 'published'])
@@ -89,7 +90,7 @@ class ServicesController extends Controller
             return $this->error('Servicio no encontrado.', status: 404);
         }
 
-        $service->increment('views_count');
+        $views->track($request, $service, 'service');
 
         return $this->success('Servicio encontrado.', $this->formatService($service->fresh(['freelancer.user', 'freelancer.skills', 'category'])));
     }

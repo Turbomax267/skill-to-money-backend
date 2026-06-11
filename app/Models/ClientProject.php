@@ -20,6 +20,7 @@ class ClientProject extends Model
         'expected_delivery_days',
         'status',
         'progress',
+        'views_count',
         'ai_generated',
     ];
 
@@ -30,6 +31,7 @@ class ClientProject extends Model
             'budget_max' => 'decimal:2',
             'expected_delivery_days' => 'integer',
             'progress' => 'integer',
+            'views_count' => 'integer',
             'ai_generated' => 'boolean',
         ];
     }
