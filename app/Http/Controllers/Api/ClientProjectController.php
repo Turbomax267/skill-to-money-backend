@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\ClientProject;
+use App\Services\ViewCounter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -72,6 +73,21 @@ class ClientProjectController extends Controller
         return $this->success('Client project updated.', $this->payload($clientProject));
     }
 
+    public function publicShow(Request $request, ClientProject $clientProject, ViewCounter $views): JsonResponse
+    {
+        if ($clientProject->status === 'cancelled') {
+            return $this->error('Client project not found.', ['project' => ['Proyecto no encontrado.']], 404);
+        }
+
+        $clientProject->load('mypeProfile.user');
+        $views->track($request, $clientProject, 'client_project');
+
+        return $this->success('Client project loaded.', [
+            ...$this->payload($clientProject),
+            'mype' => $this->mypePayload($clientProject),
+        ]);
+    }
+
     public function destroy(Request $request, ClientProject $clientProject): JsonResponse
     {
         if (! $this->ownsProject($request, $clientProject)) {
@@ -115,9 +131,27 @@ class ClientProjectController extends Controller
             'expected_delivery_days' => $project->expected_delivery_days,
             'status' => $project->status,
             'progress' => $project->progress,
+            'views_count' => $project->views_count,
             'ai_generated' => $project->ai_generated,
             'created_at' => $project->created_at,
             'updated_at' => $project->updated_at,
+        ];
+    }
+
+    private function mypePayload(ClientProject $project): array
+    {
+        $profile = $project->mypeProfile;
+
+        return [
+            'id' => $profile?->id,
+            'name' => $profile?->business_name ?? $profile?->user?->name ?? 'MYPE',
+            'business_name' => $profile?->business_name,
+            'industry' => $profile?->industry,
+            'description' => $profile?->description,
+            'website' => $profile?->website,
+            'location' => $profile?->location,
+            'profile_photo' => $profile?->profile_photo,
+            'views_count' => $profile?->views_count,
         ];
     }
 }

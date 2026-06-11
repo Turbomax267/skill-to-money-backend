@@ -27,6 +27,7 @@ class FreelancerProfile extends Model
         'rating',
         'completed_jobs',
         'visibility_score',
+        'views_count',
     ];
 
     protected function casts(): array
@@ -37,6 +38,7 @@ class FreelancerProfile extends Model
             'rating' => 'decimal:2',
             'completed_jobs' => 'integer',
             'visibility_score' => 'decimal:2',
+            'views_count' => 'integer',
         ];
     }
 
