@@ -7,7 +7,6 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Skill;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class ProfilesController extends Controller
 {
@@ -143,7 +142,7 @@ class ProfilesController extends Controller
                 'website' => $profile?->website,
                 'location' => $profile?->location,
                 'profile_photo' => $profile?->profile_photo,
-                'photo_url' => $profile?->profile_photo ? Storage::disk('public')->url($profile->profile_photo) : null,
+                'photo_url' => $this->storageUrl($profile?->profile_photo),
             ];
         }
 
@@ -165,8 +164,17 @@ class ProfilesController extends Controller
             'completed_jobs' => $profile?->completed_jobs,
             'visibility_score' => $profile?->visibility_score,
             'profile_photo' => $profile?->profile_photo,
-            'photo_url' => $profile?->profile_photo ? Storage::disk('public')->url($profile->profile_photo) : null,
+            'photo_url' => $this->storageUrl($profile?->profile_photo),
             'skills' => $profile?->skills->pluck('name')->values()->all() ?? [],
         ];
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 }

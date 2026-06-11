@@ -214,13 +214,22 @@ class MarketplaceController extends Controller
             'title' => $project->title,
             'description' => $project->description,
             'image_path' => $project->image_path,
-            'image_url' => $project->image_path ? Storage::disk('public')->url($project->image_path) : null,
+            'image_url' => $this->storageUrl($project->image_path),
             'file_path' => $project->file_path,
-            'file_url' => $project->file_path ? Storage::disk('public')->url($project->file_path) : null,
+            'file_url' => $this->storageUrl($project->file_path),
             'external_url' => $project->external_url,
             'project_order' => $project->project_order,
             'is_featured' => $project->is_featured,
             'created_at' => $project->created_at,
         ];
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 }
