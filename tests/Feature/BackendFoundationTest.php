@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Mail\WelcomeAccountMail;
 use App\Models\Category;
+use App\Models\Conversation;
+use App\Models\Notification;
 use App\Models\Service;
 use App\Models\Skill;
 use App\Models\User;
@@ -374,7 +376,7 @@ class BackendFoundationTest extends TestCase
             return str_contains($request->url(), 'openrouter.ai')
                 && ($body['max_tokens'] ?? null) === 1000
                 && ($body['model'] ?? null) === 'google/gemini-2.5-flash-lite'
-                && ($body['messages'][0]['content'] ?? null) === 'Responde unicamente en JSON valido.';
+                && ($body['messages'][0]['content'] ?? null) === 'Responde únicamente en JSON válido.';
         });
     }
 
@@ -421,7 +423,7 @@ class BackendFoundationTest extends TestCase
         ])
             ->assertStatus(503)
             ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'No se pudo generar el perfil con IA. Gemini/OpenRouter/Groq no respondieron correctamente. Revisa cuota o API keys e intenta otra vez.');
+            ->assertJsonPath('message', 'No se pudo generar el perfil con Skill Bot. Gemini/OpenRouter/Groq no respondieron correctamente. Revisa cuota o API keys e intenta otra vez.');
 
         $profile = User::where('email', 'lucia.gemini429@gmail.com')->firstOrFail()->freelancerProfile;
 
@@ -692,5 +694,92 @@ class BackendFoundationTest extends TestCase
             ->assertJsonPath('data.services.0.price', 200)
             ->assertJsonPath('data.services.0.freelancer.name', 'Diego Salazar')
             ->assertJsonPath('data.services.0.freelancer.rating', '4.90');
+    }
+
+    public function test_mype_can_create_conversation_and_send_messages_to_freelancer(): void
+    {
+        Mail::fake();
+
+        config(['services.peru_api.key' => 'fake-key']);
+
+        Http::fake([
+            'https://peruapi.com/api/ruc/20608889991*' => Http::response([
+                'ruc' => '20608889991',
+                'razon_social' => 'MENSAJES MYPE S.A.C.',
+                'estado' => 'ACTIVO',
+                'condicion' => 'HABIDO',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'MIRAFLORES',
+                'mensaje' => 'OK',
+                'code' => '200',
+            ]),
+        ]);
+
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Nicolas',
+            'last_name' => 'Ramos',
+            'dni' => '88997766',
+            'email' => 'nicolas.messages@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $freelancer = User::where('email', 'nicolas.messages@gmail.com')
+            ->firstOrFail()
+            ->freelancerProfile;
+
+        $mype = $this->postJson('/api/auth/register/mype', [
+            'company_name' => 'Mensajes MYPE',
+            'ruc' => '20608889991',
+            'email' => 'mensajes.mype@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $token = $mype->json('data.access_token');
+
+        $created = $this->withToken($token)->postJson('/api/messaging/conversations', [
+            'freelancer_profile_id' => $freelancer->id,
+            'message' => 'Hola, quiero conversar sobre tu servicio.',
+        ]);
+
+        $created->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.message.message', 'Hola, quiero conversar sobre tu servicio.');
+
+        $conversationId = $created->json('data.conversation.id');
+
+        $this->assertDatabaseHas('conversations', [
+            'id' => $conversationId,
+            'freelancer_profile_id' => $freelancer->id,
+        ]);
+
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversationId,
+            'message' => 'Hola, quiero conversar sobre tu servicio.',
+        ]);
+
+        $this->assertSame(1, Notification::count());
+
+        $second = $this->withToken($token)->postJson('/api/messaging/conversations', [
+            'freelancer_profile_id' => $freelancer->id,
+            'message' => 'Te envio mas detalle del proyecto.',
+        ]);
+
+        $second->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.conversation.id', $conversationId)
+            ->assertJsonPath('data.message.message', 'Te envio mas detalle del proyecto.');
+
+        $this->assertSame(1, Conversation::count());
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversationId,
+            'message' => 'Te envio mas detalle del proyecto.',
+        ]);
+        $this->assertSame(2, Notification::count());
+
+        $this->withToken($token)->getJson("/api/messaging/conversations/{$conversationId}")
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(2, 'data.messages');
     }
 }

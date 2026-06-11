@@ -14,6 +14,7 @@ class WelcomeAccountMail extends Mailable
     public function __construct(
         public readonly User $user,
         public readonly string $frontendUrl,
+        public readonly ?string $verificationUrl = null,
     ) {
     }
 

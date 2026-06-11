@@ -14,6 +14,49 @@ class ClientProjectController extends Controller
 {
     use ApiResponse;
 
+    public function publicIndex(Request $request): JsonResponse
+    {
+        $query = ClientProject::query()
+            ->with('mypeProfile.user')
+            ->whereIn('status', ['published', 'in_progress']);
+
+        if ($search = trim((string) $request->query('search', ''))) {
+            $query->where(function ($builder) use ($search): void {
+                $builder
+                    ->where('title', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('category', 'like', "%{$search}%");
+            });
+        }
+
+        if ($category = trim((string) $request->query('category', ''))) {
+            $query->where('category', 'like', "%{$category}%");
+        }
+
+        if ($request->filled('min_budget')) {
+            $query->where('budget_max', '>=', (float) $request->query('min_budget'));
+        }
+
+        if ($request->filled('max_budget')) {
+            $query->where('budget_min', '<=', (float) $request->query('max_budget'));
+        }
+
+        $projects = $query
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn (ClientProject $project): array => [
+                ...$this->payload($project),
+                'mype' => $this->mypePayload($project),
+            ])
+            ->values();
+
+        return $this->success('Client projects loaded.', [
+            'projects' => $projects,
+            'total' => $projects->count(),
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $profile = $request->user()->mypeProfile;
@@ -48,8 +91,8 @@ class ClientProjectController extends Controller
 
         if ($profile->clientProjects()->count() >= 1) {
             return $this->error(
-                'El plan Free permite publicar solo 1 proyecto. Actualiza a Pro para crear mas publicaciones.',
-                ['plan' => ['Actualiza a Pro para crear mas de 1 proyecto.']],
+                'El plan Free permite publicar solo 1 proyecto. Actualiza a Pro para crear más publicaciones.',
+                ['plan' => ['Actualiza a Pro para crear más de 1 proyecto.']],
                 403
             );
         }
@@ -155,3 +198,4 @@ class ClientProjectController extends Controller
         ];
     }
 }
+

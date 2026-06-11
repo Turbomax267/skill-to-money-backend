@@ -25,7 +25,7 @@ class MessagingController extends Controller
         $profile = $this->getProfile($user);
 
         if (!$profile) {
-            return $this->error('Completa tu perfil para usar mensajeria.', null, 400);
+            return $this->error('Completa tu perfil para usar mensajería.', null, 400);
         }
 
         $profileType = $user->user_type === 'mype' ? 'mype' : 'freelancer';
@@ -49,7 +49,7 @@ class MessagingController extends Controller
         $profile = $this->getProfile($user);
 
         if (!$profile) {
-            return $this->error('Completa tu perfil para usar mensajeria.', null, 400);
+            return $this->error('Completa tu perfil para usar mensajería.', null, 400);
         }
 
         $isMype = $user->user_type === 'mype';
@@ -71,6 +71,11 @@ class MessagingController extends Controller
         if ($existing) {
             $message = $this->createMessage($existing->id, $user->id, $request->input('message'));
             $existing->touchLastMessage();
+            $existing->refresh();
+
+            $this->createNotification($existing, $user);
+
+            broadcast(new MessageSent($existing, $message));
 
             return $this->success('Mensaje enviado.', [
                 'conversation' => $this->formatConversation($existing, $user),
@@ -180,7 +185,7 @@ class MessagingController extends Controller
 
         $this->markMessagesAsRead($conversation, $user);
 
-        return $this->success('Mensajes marcados como leidos.');
+        return $this->success('Mensajes marcados como leídos.');
     }
 
     public function unreadCount(Request $request): JsonResponse
@@ -206,7 +211,7 @@ class MessagingController extends Controller
             ->whereNull('read_at')
             ->count();
 
-        return $this->success('Contador de no leidos.', [
+        return $this->success('Contador de no leídos.', [
             'messages' => $unreadConversations,
             'notifications' => $unreadNotifications,
             'total' => $unreadConversations + $unreadNotifications,
@@ -384,3 +389,4 @@ class MessagingController extends Controller
         ];
     }
 }
+

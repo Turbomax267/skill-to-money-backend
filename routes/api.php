@@ -33,6 +33,7 @@ Route::prefix('auth')->group(function (): void {
     Route::post('/register/freelancer', [AuthController::class, 'registerFreelancer']);
     Route::post('/register/mype', [AuthController::class, 'registerMype']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth.api');
@@ -50,6 +51,7 @@ Route::middleware('auth.api')->group(function (): void {
 
     Route::get('/client/projects', [ClientProjectController::class, 'index']);
     Route::post('/client/projects', [ClientProjectController::class, 'store']);
+    Route::get('/client-projects', [ClientProjectController::class, 'publicIndex']);
     Route::get('/client-projects/{clientProject}', [ClientProjectController::class, 'publicShow']);
     Route::put('/client/projects/{clientProject}', [ClientProjectController::class, 'update']);
     Route::delete('/client/projects/{clientProject}', [ClientProjectController::class, 'destroy']);

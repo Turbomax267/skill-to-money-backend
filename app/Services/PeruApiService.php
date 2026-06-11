@@ -14,7 +14,7 @@ class PeruApiService
         if (empty($apiKey)) {
             return [
                 'valid' => false,
-                'message' => 'No se configuro la API Key de Peru API.',
+                'message' => 'No se configuró la API Key de Peru API.',
             ];
         }
 
@@ -63,7 +63,7 @@ class PeruApiService
         if (($data['code'] ?? null) !== '200' || empty($data['nombres'])) {
             return [
                 'valid' => false,
-                'message' => 'El DNI no existe o no tiene datos validos en RENIEC.',
+                'message' => 'El DNI no existe o no tiene datos válidos en RENIEC.',
             ];
         }
 
@@ -83,7 +83,7 @@ class PeruApiService
         if (empty($apiKey)) {
             return [
                 'valid' => false,
-                'message' => 'No se configuro la API Key de Peru API.',
+                'message' => 'No se configuró la API Key de Peru API.',
             ];
         }
 
@@ -135,7 +135,7 @@ class PeruApiService
         if (($data['code'] ?? null) !== '200' || empty($data['razon_social'])) {
             return [
                 'valid' => false,
-                'message' => 'El RUC no existe o no tiene datos validos en SUNAT.',
+                'message' => 'El RUC no existe o no tiene datos válidos en SUNAT.',
             ];
         }
 
@@ -241,3 +241,4 @@ class PeruApiService
         return $parts === [] ? null : implode(', ', $parts);
     }
 }
+
