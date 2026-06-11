@@ -7,10 +7,17 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Skill;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ProfilesController extends Controller
 {
     use ApiResponse;
+
+    private const SKILL_GROUP_PREFIXES = [
+        'skills' => 'habilidades/',
+        'tools' => 'herramientas/',
+        'areas' => 'areas de desempeno/',
+    ];
 
     public function index(): JsonResponse
     {
@@ -86,7 +93,7 @@ class ProfilesController extends Controller
     {
         $data = $request->validate([
             'skills' => ['required', 'array'],
-            'skills.*' => ['required', 'string', 'max:100'],
+            'skills.*.id' => ['required', 'integer', 'exists:skills,id'],
         ]);
 
         $profile = $request->user()->freelancerProfile;
@@ -96,16 +103,54 @@ class ProfilesController extends Controller
         }
 
         $skillIds = collect($data['skills'])
-            ->map(fn (string $name): string => trim($name))
-            ->filter()
+            ->pluck('id')
+            ->map(fn (int $id): int => $id)
             ->unique()
-            ->map(fn (string $name): int => Skill::query()->firstOrCreate(['name' => $name])->id)
             ->values()
             ->all();
 
         $profile->skills()->sync($skillIds);
 
         return $this->success('Skills updated.', $this->profilePayload($request));
+    }
+
+    public function skillOptions(): JsonResponse
+    {
+        $skills = Skill::query()
+            ->orderBy('category')
+            ->orderBy('name')
+            ->get(['id', 'name', 'category']);
+
+        $items = $skills->map(function (Skill $skill): array {
+            $group = 'Otros';
+            $subcategory = null;
+            $normalizedCategory = Str::of($skill->category ?? '')->ascii()->lower()->value();
+
+            foreach (self::SKILL_GROUP_PREFIXES as $candidateGroup => $prefix) {
+                if ($skill->category !== null && str_starts_with($normalizedCategory, $prefix)) {
+                    $group = $candidateGroup;
+                    $subcategory = trim(explode('/', $skill->category, 2)[1] ?? '');
+                    break;
+                }
+            }
+
+            return [
+                'id' => $skill->id,
+                'name' => $skill->name,
+                'category' => $skill->category,
+                'group' => $group,
+                'subcategory' => $subcategory !== '' ? $subcategory : null,
+            ];
+        })->values();
+
+        return $this->success('Skill options loaded.', [
+            'items' => $items,
+            'grouped' => [
+                'skills' => $items->where('group', 'skills')->values(),
+                'tools' => $items->where('group', 'tools')->values(),
+                'areas' => $items->where('group', 'areas')->values(),
+            ],
+        ]);
     }
 
     public function updatePhoto(Request $request): JsonResponse
@@ -166,6 +211,14 @@ class ProfilesController extends Controller
             'profile_photo' => $profile?->profile_photo,
             'photo_url' => $this->storageUrl($profile?->profile_photo),
             'skills' => $profile?->skills->pluck('name')->values()->all() ?? [],
+            'skill_items' => $profile?->skills
+                ->map(fn (Skill $skill): array => [
+                    'id' => $skill->id,
+                    'name' => $skill->name,
+                    'category' => $skill->category,
+                ])
+                ->values()
+                ->all() ?? [],
         ];
     }
 
