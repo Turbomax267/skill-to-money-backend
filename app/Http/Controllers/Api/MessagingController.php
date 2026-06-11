@@ -341,20 +341,14 @@ class MessagingController extends Controller
             ->count();
 
         $otherUserName = $otherParty?->user?->name ?? ($isMype ? 'Freelancer' : 'MYPE');
-        $otherPhoto = null;
-
-        if ($isMype && $otherParty) {
-            $otherPhoto = $otherParty->profile_photo;
-        } elseif (!$isMype && $otherParty) {
-            $otherPhoto = $otherParty->profile_photo;
-        }
+        $otherPhoto = $otherParty?->profile_photo;
 
         return [
             'id' => $conv->id,
             'other_user' => [
                 'id' => $otherParty?->user?->id,
                 'name' => $otherUserName,
-                'photo_url' => $otherPhoto,
+                'photo_url' => $otherPhoto ? $this->storageUrl($otherPhoto) : null,
             ],
             'last_message' => $lastMessage?->message ?? '',
             'last_message_at' => $conv->last_message_at?->toISOString() ?? $conv->created_at->toISOString(),
@@ -363,6 +357,15 @@ class MessagingController extends Controller
             'status' => $conv->status,
             'created_at' => $conv->created_at->toISOString(),
         ];
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 
     private function formatMessage(Message $msg, User $currentUser): array
