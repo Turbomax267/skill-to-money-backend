@@ -23,10 +23,12 @@ RUN mkdir -p storage/app/public \
     storage/framework/sessions \
     storage/framework/views \
     bootstrap/cache \
+    && mkdir -p docker/prod \
+    && chmod +x docker/prod/start-prod.sh \
     && (php artisan storage:link || true) \
     && chown -R www-data:www-data storage bootstrap/cache public/storage \
     && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 80
 
-CMD php artisan config:cache && apache2-foreground
+CMD ["/bin/sh", "/var/www/html/docker/prod/start-prod.sh"]

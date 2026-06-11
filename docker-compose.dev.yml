@@ -1,0 +1,13 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: skill-to-money-backend-dev
+    ports:
+      - "8000:80"
+    env_file:
+      - .env
+    volumes:
+      - .:/var/www/html
+    command: ["/bin/sh", "/var/www/html/docker/dev/start-dev.sh"]
