@@ -28,4 +28,9 @@ class MypeProfile extends Model
     {
         return $this->hasMany(Favorite::class);
     }
+
+    public function clientProjects(): HasMany
+    {
+        return $this->hasMany(ClientProject::class);
+    }
 }
