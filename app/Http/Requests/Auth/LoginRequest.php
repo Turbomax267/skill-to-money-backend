@@ -17,7 +17,8 @@ class LoginRequest extends ApiRequest
     public function messages(): array
     {
         return [
-            'email.email' => 'Coloque un correo valido.',
+            'email.email' => 'Coloque un correo válido.',
         ];
     }
 }
+

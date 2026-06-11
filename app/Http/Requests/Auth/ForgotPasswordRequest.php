@@ -24,7 +24,8 @@ class ForgotPasswordRequest extends ApiRequest
     {
         return [
             'email.exists' => 'No encontramos una cuenta con ese correo.',
-            'email.email' => 'Ingresa un correo valido.',
+            'email.email' => 'Ingresa un correo válido.',
         ];
     }
 }
+

@@ -12,10 +12,10 @@ use RuntimeException;
 
 class WebhookMailService
 {
-    public function sendWelcomeMail(User $user, string $frontendUrl): void
+    public function sendWelcomeMail(User $user, string $frontendUrl, ?string $verificationUrl = null): void
     {
         if (! $this->shouldUseWebhookMailer()) {
-            Mail::to($user->email)->send(new WelcomeAccountMail($user, $frontendUrl));
+            Mail::to($user->email)->send(new WelcomeAccountMail($user, $frontendUrl, $verificationUrl));
 
             return;
         }
@@ -26,8 +26,11 @@ class WebhookMailService
             html: View::make('emails.welcome-account', [
                 'user' => $user,
                 'frontendUrl' => $frontendUrl,
+                'verificationUrl' => $verificationUrl,
             ])->render(),
-            text: "Hola {$user->name}, tu cuenta en Skill-to-Money ya esta lista. Ingresa en {$frontendUrl}"
+            text: $verificationUrl
+                ? "Hola {$user->name}, verifica tu correo para continuar en Skill-to-Money: {$verificationUrl}"
+                : "Hola {$user->name}, tu cuenta en Skill-to-Money ya esta lista. Ingresa en {$frontendUrl}"
         );
     }
 
@@ -40,7 +43,7 @@ class WebhookMailService
                 'user' => $user,
                 'url' => $url,
             ])->render(),
-            text: "Hola {$user->name}, usa este enlace para restablecer tu contrasena en Skill-to-Money: {$url}"
+            text: "Hola {$user->name}, usa este enlace para restablecer tu contraseña en Skill-to-Money: {$url}"
         );
     }
 
@@ -90,3 +93,4 @@ class WebhookMailService
         }
     }
 }
+

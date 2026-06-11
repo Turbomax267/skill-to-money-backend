@@ -8,17 +8,17 @@ use Throwable;
 class GeminiService
 {
     private const PROMPT = <<<'PROMPT'
-Eres un asesor experto en freelancing para jóvenes principiantes en Perú.
-Con la información del freelancer, genera un perfil profesional atractivo, servicios recomendados y mejoras de presentación.
+Eres un asesor experto en freelancing para jÃ³venes principiantes en PerÃº.
+Con la informaciÃ³n del freelancer, genera un perfil profesional atractivo, servicios recomendados y mejoras de presentaciÃ³n.
 No inventes experiencia que el usuario no haya mencionado.
 No exageres habilidades.
 No uses datos sensibles.
 Los precios deben ser referenciales y en soles peruanos.
 Genera exactamente 1 servicio recomendado.
-Si has_projects es "no", genera exactamente 3 proyectos practicos para iniciar portafolio segun habilidades y herramientas.
-Si has_projects es "si", optimiza solo los proyectos enviados, maximo 3.
-Usa textos breves: descripciones de maximo 180 caracteres.
-Responde únicamente en JSON válido con esta estructura:
+Si has_projects es "no", genera exactamente 3 proyectos prácticos para iniciar portafolio según habilidades y herramientas.
+Si has_projects es "si", optimiza solo los proyectos enviados, máximo 3.
+Usa textos breves: descripciones de máximo 180 caracteres.
+Responde Ãºnicamente en JSON vÃ¡lido con esta estructura:
 {"titulo_profesional":"","descripcion_profesional":"","propuesta_valor":"","skills_destacadas":[],"herramientas_destacadas":[],"proyectos_optimizados":[{"nombre":"","descripcion_mejorada":"","categoria":"","herramientas":[]}],"servicios_recomendados":[{"nombre":"","descripcion":"","precio_sugerido":"","tiempo_entrega":"","categoria":""}],"recomendaciones_mejora":[]}
 PROMPT;
 
@@ -50,14 +50,14 @@ PROMPT;
                 'valid' => true,
                 'fallback' => true,
                 'source' => 'local_fallback',
-                'message' => 'Los proveedores de IA no estuvieron disponibles. Se genero un perfil basico local para la demo.',
+                'message' => 'Los proveedores de Skill Bot no estuvieron disponibles. Se generó un perfil básico local para la demo.',
                 'data' => $this->normalizeAnalysis($this->buildLocalFallbackAnalysis($input)),
                 'provider_errors' => $providerErrors,
             ];
         }
 
         return $this->error(
-            'No se pudo generar el perfil con IA. Gemini/OpenRouter/Groq no respondieron correctamente. Revisa cuota o API keys e intenta otra vez.',
+            'No se pudo generar el perfil con Skill Bot. Gemini/OpenRouter/Groq no respondieron correctamente. Revisa cuota o API keys e intenta otra vez.',
             503,
             'ai_unavailable',
             $providerErrors,
@@ -69,7 +69,7 @@ PROMPT;
         $apiKey = config('services.gemini.key');
 
         if (empty($apiKey)) {
-            return $this->error('No se configuro la API Key de Gemini.', 422, 'not_configured');
+            return $this->error('No se configuró la API Key de Gemini.', 422, 'not_configured');
         }
 
         try {
@@ -97,18 +97,18 @@ PROMPT;
         }
 
         if ($response->status() === 429) {
-            return $this->error('Gemini alcanzo su limite de cuota.', 429, 'quota_exceeded');
+            return $this->error('Gemini alcanzó su limite de cuota.', 429, 'quota_exceeded');
         }
 
         if (!$response->successful()) {
-            return $this->error('Gemini API respondio con error: ' . $response->body());
+            return $this->error('Gemini API respondió con error: ' . $response->body());
         }
 
         $result = $response->json();
         $text = $result['candidates'][0]['content']['parts'][0]['text'] ?? '';
 
         if (empty($text)) {
-            return $this->error('Gemini no devolvio contenido.');
+            return $this->error('Gemini no devolvió contenido.');
         }
 
         return $this->parseProviderJson('gemini', $text, 'Perfil analizado y actualizado exitosamente.');
@@ -119,7 +119,7 @@ PROMPT;
         $apiKey = config('services.openrouter.key');
 
         if (empty($apiKey)) {
-            return $this->error('No se configuro la API Key de OpenRouter.', 422, 'not_configured');
+            return $this->error('No se configuró la API Key de OpenRouter.', 422, 'not_configured');
         }
 
         $headers = [
@@ -143,7 +143,7 @@ PROMPT;
                     'messages' => [
                         [
                             'role' => 'system',
-                            'content' => 'Responde unicamente en JSON valido.',
+                            'content' => 'Responde únicamente en JSON válido.',
                         ],
                         [
                             'role' => 'user',
@@ -159,17 +159,17 @@ PROMPT;
         }
 
         if ($response->status() === 429) {
-            return $this->error('OpenRouter alcanzo su limite de cuota.', 429, 'quota_exceeded');
+            return $this->error('OpenRouter alcanzó su limite de cuota.', 429, 'quota_exceeded');
         }
 
         if (!$response->successful()) {
-            return $this->error('OpenRouter API respondio con error: ' . $response->body(), $response->status());
+            return $this->error('OpenRouter API respondió con error: ' . $response->body(), $response->status());
         }
 
         $text = $response->json('choices.0.message.content') ?? '';
 
         if (empty($text)) {
-            return $this->error('OpenRouter no devolvio contenido.');
+            return $this->error('OpenRouter no devolvió contenido.');
         }
 
         return $this->parseProviderJson('openrouter', $text, 'Gemini no estuvo disponible. Perfil generado con OpenRouter.');
@@ -180,7 +180,7 @@ PROMPT;
         $apiKey = config('services.groq.key');
 
         if (empty($apiKey)) {
-            return $this->error('No se configuro la API Key de Groq.', 422, 'not_configured');
+            return $this->error('No se configuró la API Key de Groq.', 422, 'not_configured');
         }
 
         try {
@@ -194,7 +194,7 @@ PROMPT;
                     'messages' => [
                         [
                             'role' => 'system',
-                            'content' => 'Responde unicamente en JSON valido.',
+                            'content' => 'Responde únicamente en JSON válido.',
                         ],
                         [
                             'role' => 'user',
@@ -210,17 +210,17 @@ PROMPT;
         }
 
         if ($response->status() === 429) {
-            return $this->error('Groq alcanzo su limite de cuota.', 429, 'quota_exceeded');
+            return $this->error('Groq alcanzó su limite de cuota.', 429, 'quota_exceeded');
         }
 
         if (!$response->successful()) {
-            return $this->error('Groq API respondio con error: ' . $response->body(), $response->status());
+            return $this->error('Groq API respondió con error: ' . $response->body(), $response->status());
         }
 
         $text = $response->json('choices.0.message.content') ?? '';
 
         if (empty($text)) {
-            return $this->error('Groq no devolvio contenido.');
+            return $this->error('Groq no devolvió contenido.');
         }
 
         return $this->parseProviderJson('groq', $text, 'Gemini/OpenRouter no estuvieron disponibles. Perfil generado con Groq.');
@@ -231,7 +231,7 @@ PROMPT;
         $parsed = $this->decodeGeminiJson($text);
 
         if (!$parsed) {
-            return $this->error(ucfirst($source) . ' no devolvio un JSON valido.');
+            return $this->error(ucfirst($source) . ' no devolvió un JSON válido.');
         }
 
         return [
@@ -300,21 +300,21 @@ PROMPT;
         return [
             'titulo_profesional' => $this->titleCase($primarySkill) . ' para negocios digitales',
             'descripcion_profesional' => $description,
-            'propuesta_valor' => "Ayudo a clientes a resolver necesidades digitales usando {$primarySkill} y {$primaryTool}, con entregas claras y enfoque practico.",
+            'propuesta_valor' => "Ayudo a clientes a resolver necesidades digitales usando {$primarySkill} y {$primaryTool}, con entregas claras y enfoque práctico.",
             'skills_destacadas' => $skills,
             'herramientas_destacadas' => $tools,
             'proyectos_optimizados' => $this->fallbackProjects($projects, $primarySkill, $category, $tools),
             'servicios_recomendados' => [
                 [
                     'nombre' => 'Servicio inicial de ' . $primarySkill,
-                    'descripcion' => 'Servicio basico orientado a resolver una necesidad concreta del cliente con entregables simples y revisables.',
+                    'descripcion' => 'Servicio básico orientado a resolver una necesidad concreta del cliente con entregables simples y revisables.',
                     'precio_sugerido' => 'S/ 30 por hora',
                     'tiempo_entrega' => $availabilityTime ?: '3 a 5 dias',
                     'categoria' => $category,
                 ],
                 [
                     'nombre' => 'Mejora de presencia digital',
-                    'descripcion' => 'Apoyo para ordenar, mejorar o presentar mejor un activo digital segun las habilidades declaradas.',
+                    'descripcion' => 'Apoyo para ordenar, mejorar o presentar mejor un activo digital según las habilidades declaradas.',
                     'precio_sugerido' => 'S/ 120 por proyecto',
                     'tiempo_entrega' => '5 a 7 dias',
                     'categoria' => $category,
@@ -334,7 +334,7 @@ PROMPT;
             return [
                 [
                     'nombre' => 'Proyecto inicial de ' . $primarySkill,
-                    'descripcion_mejorada' => 'Proyecto practico para demostrar habilidades principales y construir evidencia de trabajo.',
+                    'descripcion_mejorada' => 'Proyecto práctico para demostrar habilidades principales y construir evidencia de trabajo.',
                     'categoria' => $category,
                     'herramientas' => $tools,
                 ],
@@ -547,3 +547,4 @@ PROMPT;
         ];
     }
 }
+

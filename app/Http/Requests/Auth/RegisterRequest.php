@@ -83,9 +83,9 @@ class RegisterRequest extends ApiRequest
             'ruc.required' => 'El RUC es obligatorio para MYPES.',
             'ruc.digits' => 'El RUC debe contener exactamente 11 numeros.',
             'ruc.unique' => 'Este RUC ya esta registrado.',
-            'email.email' => 'Ingresa un correo valido.',
+            'email.email' => 'Ingresa un correo válido.',
             'email.unique' => 'Este correo ya se encuentra registrado.',
-            'password.min' => 'La contrasena debe tener al menos 8 caracteres.',
+            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
         ];
     }
 
@@ -96,7 +96,7 @@ class RegisterRequest extends ApiRequest
             $domain = ltrim($domain, '@');
 
             if (! in_array($domain, self::FREELANCER_EMAIL_DOMAINS, true)) {
-                $fail('Usa un correo personal valido, por ejemplo Gmail, Outlook, Hotmail, Yahoo o iCloud.');
+                $fail('Usa un correo personal válido, por ejemplo Gmail, Outlook, Hotmail, Yahoo o iCloud.');
             }
         };
     }
@@ -111,3 +111,4 @@ class RegisterRequest extends ApiRequest
         return ! $this->isMypeRegistration();
     }
 }
+

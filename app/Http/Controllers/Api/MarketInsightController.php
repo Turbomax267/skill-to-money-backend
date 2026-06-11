@@ -26,7 +26,7 @@ class MarketInsightController extends Controller
         $projects = $this->marketProjects($keywords);
 
         if ($projects->isEmpty()) {
-            return $this->success('No hay tendencias suficientes para tu perfil todavia.', [
+            return $this->success('No hay tendencias suficientes para tu perfil todavía.', [
                 'trends' => [],
                 'has_data' => false,
                 'keywords' => $keywords,
@@ -90,7 +90,7 @@ class MarketInsightController extends Controller
         $budgets = $this->budgets($projects);
 
         if (empty($budgets)) {
-            return $this->success('No hay datos suficientes para recomendar precios todavia.', [
+            return $this->success('No hay datos suficientes para recomendar precios todavía.', [
                 'has_data' => false,
                 'sample_count' => 0,
                 'recommended_min' => null,
@@ -206,3 +206,4 @@ class MarketInsightController extends Controller
         return round(array_sum($values) / count($values), 2);
     }
 }
+

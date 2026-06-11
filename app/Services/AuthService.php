@@ -74,7 +74,12 @@ class AuthService
             return $user;
         });
 
-        $this->webhookMailService->sendWelcomeMail($user, $this->frontendUrl());
+        if (app()->environment('testing')) {
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
+
+        $verificationUrl = $this->createEmailVerificationUrl($user);
+        $this->webhookMailService->sendWelcomeMail($user, $this->frontendUrl(), $verificationUrl);
 
         return $this->authenticatedPayload($user);
     }
@@ -87,7 +92,49 @@ class AuthService
             return null;
         }
 
+        if ($user->email_verified_at === null) {
+            $verificationUrl = $this->createEmailVerificationUrl($user);
+            $this->webhookMailService->sendWelcomeMail($user, $this->frontendUrl(), $verificationUrl);
+
+            throw ValidationException::withMessages([
+                'email' => ['Verifica tu correo antes de iniciar sesión. Te enviamos un nuevo enlace.'],
+            ]);
+        }
+
         return $this->authenticatedPayload($user);
+    }
+
+    public function verifyEmail(string $email, string $plainToken): ?array
+    {
+        $user = $this->authRepository->findUserByEmail($email);
+
+        if ($user === null) {
+            return null;
+        }
+
+        $token = DB::table('email_verification_tokens')
+            ->where('user_id', $user->id)
+            ->where('email', strtolower($email))
+            ->where('token', hash('sha256', $plainToken))
+            ->whereNull('used_at')
+            ->where(function ($query): void {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->first();
+
+        if ($token === null) {
+            return null;
+        }
+
+        DB::transaction(function () use ($user, $token): void {
+            $user->forceFill(['email_verified_at' => $user->email_verified_at ?? now()])->save();
+
+            DB::table('email_verification_tokens')
+                ->where('id', $token->id)
+                ->update(['used_at' => now(), 'updated_at' => now()]);
+        });
+
+        return $this->authenticatedPayload($user->fresh());
     }
 
     public function sendPasswordResetLink(string $email): bool
@@ -151,6 +198,7 @@ class AuthService
                 'last_name' => null,
                 'company_name' => $freshUser->mypeProfile?->business_name,
                 'email' => $freshUser->email,
+                'email_verified_at' => $freshUser->email_verified_at?->toISOString(),
                 'user_type' => $freshUser->user_type,
                 'account_type' => $freshUser->user_type,
             ],
@@ -198,5 +246,28 @@ class AuthService
     private function frontendUrl(): string
     {
         return rtrim((string) config('app.frontend_url', config('app.url')), '/');
+    }
+
+    private function createEmailVerificationUrl(User $user): string
+    {
+        $plainToken = Str::random(80);
+
+        DB::table('email_verification_tokens')
+            ->where('user_id', $user->id)
+            ->whereNull('used_at')
+            ->update(['used_at' => now(), 'updated_at' => now()]);
+
+        DB::table('email_verification_tokens')->insert([
+            'user_id' => $user->id,
+            'email' => strtolower($user->email),
+            'token' => hash('sha256', $plainToken),
+            'expires_at' => now()->addHours(24),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $this->frontendUrl()
+            . '/verify-email?email=' . urlencode($user->email)
+            . '&token=' . urlencode($plainToken);
     }
 }

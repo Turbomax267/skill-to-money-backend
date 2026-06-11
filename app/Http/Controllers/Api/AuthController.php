@@ -52,15 +52,33 @@ class AuthController extends Controller
         return $this->success('Session started.', $result);
     }
 
+    public function verifyEmail(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email:rfc'],
+            'token' => ['required', 'string'],
+        ]);
+
+        $result = $this->authService->verifyEmail($data['email'], $data['token']);
+
+        if ($result === null) {
+            return $this->error('El enlace de verificaciÃ³n no es vÃ¡lido o expirÃ³.', [
+                'token' => ['Solicita un nuevo enlace e intÃ©ntalo otra vez.'],
+            ], 422);
+        }
+
+        return $this->success('Correo verificado correctamente.', $result);
+    }
+
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
         $sent = $this->authService->sendPasswordResetLink($request->validated('email'));
 
         if (! $sent) {
-            return $this->error('No se pudo enviar el enlace de recuperacion.', ['email' => ['Intentalo nuevamente.']], 500);
+            return $this->error('No se pudo enviar el enlace de recuperación.', ['email' => ['Inténtalo nuevamente.']], 500);
         }
 
-        return $this->success('Te enviamos un enlace para recuperar tu contrasena.');
+        return $this->success('Te enviamos un enlace para recuperar tu contraseña.');
     }
 
     public function resetPassword(ResetPasswordRequest $request): JsonResponse
@@ -68,7 +86,7 @@ class AuthController extends Controller
         $reset = $this->authService->resetPassword($request->validated());
 
         if (! $reset) {
-            return $this->error('El enlace de recuperacion no es valido o expiro.', ['token' => ['Token invalido.']], 422);
+            return $this->error('El enlace de recuperación no es válido o expiró.', ['token' => ['Token inválido.']], 422);
         }
 
         return $this->success('Contrasena actualizada correctamente.');
@@ -81,3 +99,4 @@ class AuthController extends Controller
         return $this->success('Session closed.');
     }
 }
+
