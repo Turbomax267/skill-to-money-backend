@@ -81,6 +81,16 @@ Route::middleware('auth.api')->group(function (): void {
     Route::post('/freelancer/portfolio/{portfolioProject}', [MarketplaceController::class, 'updatePortfolioProject']);
     Route::put('/freelancer/portfolio/{portfolioProject}', [MarketplaceController::class, 'updatePortfolioProject']);
     Route::delete('/freelancer/portfolio/{portfolioProject}', [MarketplaceController::class, 'deletePortfolioProject']);
-    Route::get('/messaging', [MessagingController::class, 'index']);
+    Route::prefix('messaging')->group(function (): void {
+        Route::get('/conversations', [MessagingController::class, 'conversations']);
+        Route::post('/conversations', [MessagingController::class, 'createConversation']);
+        Route::get('/conversations/{id}', [MessagingController::class, 'showConversation']);
+        Route::post('/conversations/{id}/messages', [MessagingController::class, 'sendMessage']);
+        Route::put('/conversations/{id}/read', [MessagingController::class, 'markAsRead']);
+        Route::get('/unread-count', [MessagingController::class, 'unreadCount']);
+        Route::get('/notifications', [MessagingController::class, 'notifications']);
+        Route::put('/notifications/{id}/read', [MessagingController::class, 'markNotificationRead']);
+        Route::put('/notifications/read-all', [MessagingController::class, 'markAllNotificationsRead']);
+    });
     Route::get('/recommendations', [RecommendationController::class, 'index']);
 });
