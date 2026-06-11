@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\Api\ClientProjectController;
 use App\Http\Controllers\Api\FavoritesController;
 use App\Http\Controllers\Api\GeminiController;
 use App\Http\Controllers\Api\HealthController;
@@ -44,6 +45,11 @@ Route::middleware('auth.api')->group(function (): void {
 
     Route::get('/services', [ServicesController::class, 'index']);
     Route::get('/services/{id}', [ServicesController::class, 'show']);
+
+    Route::get('/client/projects', [ClientProjectController::class, 'index']);
+    Route::post('/client/projects', [ClientProjectController::class, 'store']);
+    Route::put('/client/projects/{clientProject}', [ClientProjectController::class, 'update']);
+    Route::delete('/client/projects/{clientProject}', [ClientProjectController::class, 'destroy']);
 
     Route::get('/favorites', [FavoritesController::class, 'index']);
     Route::post('/favorites', [FavoritesController::class, 'store']);
