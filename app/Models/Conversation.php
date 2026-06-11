@@ -42,4 +42,9 @@ class Conversation extends Model
     {
         return $this->hasMany(Message::class);
     }
+
+    public function touchLastMessage(): void
+    {
+        $this->update(['last_message_at' => now()]);
+    }
 }
