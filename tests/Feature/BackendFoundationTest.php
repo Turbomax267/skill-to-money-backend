@@ -324,7 +324,7 @@ class BackendFoundationTest extends TestCase
         Http::assertSent(fn ($request) =>
             $request->url() === 'https://api.culqi.com/v2/charges'
             && $request->hasHeader('Authorization', 'Bearer sk_test_fake')
-            && ($request['amount'] ?? null) === 2900
+            && ($request['amount'] ?? null) === 4900
             && ($request['source_id'] ?? null) === 'tkn_test_skillpro'
             && ($request['metadata']['plan'] ?? null) === 'pro'
         );
