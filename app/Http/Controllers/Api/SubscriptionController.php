@@ -24,17 +24,17 @@ class SubscriptionController extends Controller
     public function show(Request $request): JsonResponse
     {
         if (! Schema::hasTable('subscriptions')) {
-            return $this->success('Suscripcion cargada.', $this->freePayload($request->user()));
+            return $this->success('Suscripción cargada.', $this->freePayload($request->user()));
         }
 
-        return $this->success('Suscripcion cargada.', $this->subscriptionPayload($request->user()));
+        return $this->success('Suscripción cargada.', $this->subscriptionPayload($request->user()));
     }
 
     public function checkout(Request $request): JsonResponse
     {
         if (! Schema::hasTable('subscriptions') || ! Schema::hasTable('subscription_payments')) {
             return $this->error(
-                'La pasarela de suscripcion aun no esta lista. Ejecuta las migraciones en Render.',
+                'La pasarela de suscripción aún no está lista. Ejecuta las migraciones en Render.',
                 ['database' => ['Faltan las tablas subscriptions o subscription_payments.']],
                 503
             );
@@ -161,7 +161,7 @@ class SubscriptionController extends Controller
                 'currency_code' => 'PEN',
                 'email' => $details['culqi_email'] ?? $user->email,
                 'source_id' => $details['culqi_token'],
-                'description' => 'Suscripcion SkillPro ' . ($cycle === 'yearly' ? 'anual' : 'mensual'),
+                'description' => 'Suscripción SkillPro ' . ($cycle === 'yearly' ? 'anual' : 'mensual'),
                 'installments' => 0,
                 'metadata' => [
                     'local_payment_id' => (string) $payment->id,
@@ -184,7 +184,7 @@ class SubscriptionController extends Controller
         }
 
         if (!$this->isSuccessfulCulqiCharge($charge)) {
-            $message = (string) (data_get($charge, 'user_message') ?? data_get($charge, 'merchant_message') ?? 'Culqi no aprobo el cargo.');
+            $message = (string) (data_get($charge, 'user_message') ?? data_get($charge, 'merchant_message') ?? 'Culqi no aprobó el cargo.');
             $payment->forceFill([
                 'status' => 'failed',
                 'provider_reference' => data_get($charge, 'id') ?? $payment->provider_reference,
@@ -200,7 +200,7 @@ class SubscriptionController extends Controller
 
         $payment = $this->activateSubscriptionFromPayment($payment, $charge, 'charge.creation.succeeded');
 
-        return $this->success('Pago Culqi aprobado. Tu plan Pro esta activo.', [
+        return $this->success('Pago Culqi aprobado. Tu plan Pro está activo.', [
             ...$this->subscriptionPayload($user->fresh()),
             'payment' => $this->paymentPayload($payment),
         ], 201);
@@ -280,7 +280,7 @@ class SubscriptionController extends Controller
             ];
         });
 
-        return $this->success('Pago aprobado. Tu plan Pro esta activo.', [
+        return $this->success('Pago aprobado. Tu plan Pro está activo.', [
             ...$this->subscriptionPayload($user->fresh()),
             'payment' => $this->paymentPayload($result['payment']),
         ], 201);
@@ -512,11 +512,11 @@ class SubscriptionController extends Controller
         if ($userType === 'mype') {
             return $plan === 'pro'
                 ? ['Publicaciones ilimitadas', 'Mayor visibilidad', 'Recomendaciones avanzadas', 'Soporte prioritario']
-                : ['1 publicacion activa', 'Buscar freelancers', 'Guardar favoritos', 'Explorar servicios'];
+                : ['1 publicación activa', 'Buscar freelancers', 'Guardar favoritos', 'Explorar servicios'];
         }
 
         return $plan === 'pro'
-            ? ['Servicios ilimitados', 'Mas visibilidad', 'Skill Bot ampliado', 'Mejoras de perfil']
-            : ['Perfil freelancer', 'Portafolio basico', '1 servicio recomendado', 'Visibilidad estandar'];
+            ? ['Servicios ilimitados', 'Más visibilidad', 'Skill Bot ampliado', 'Mejoras de perfil']
+            : ['Perfil freelancer', 'Portafolio básico', '1 servicio recomendado', 'Visibilidad estándar'];
     }
 }
