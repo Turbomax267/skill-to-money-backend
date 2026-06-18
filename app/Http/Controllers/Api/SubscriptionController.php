@@ -367,12 +367,22 @@ class SubscriptionController extends Controller
         $object = data_get($charge, 'object');
         $state = strtolower((string) data_get($charge, 'state', ''));
         $responseCode = strtolower((string) data_get($charge, 'response_code', ''));
+        $status = strtolower((string) data_get($charge, 'status', ''));
 
         return ($object === null || $object === 'charge')
             && (
                 $state === 'exitosa'
+                || $state === 'aprobada'
+                || $state === 'aprobado'
+                || $state === 'approved'
+                || $state === 'succeeded'
                 || $responseCode === 'venta_exitosa'
                 || str_contains($responseCode, 'exitosa')
+                || str_contains($responseCode, 'aprobada')
+                || str_contains($responseCode, 'aprobado')
+                || str_contains($responseCode, 'approved')
+                || $status === 'approved'
+                || $status === 'succeeded'
             );
     }
 
