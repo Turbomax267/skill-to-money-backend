@@ -18,6 +18,12 @@ abstract class Controller
         $normalizedPath = ltrim($path, '/');
         $normalizedPath = preg_replace('#^(api/media|storage)/#i', '', $normalizedPath) ?? $normalizedPath;
 
-        return url('/api/media/' . $normalizedPath);
+        $url = request()->getSchemeAndHttpHost() . '/api/media/' . $normalizedPath;
+
+        if (app()->isProduction()) {
+            $url = str_replace('http://', 'https://', $url);
+        }
+
+        return $url;
     }
 }
