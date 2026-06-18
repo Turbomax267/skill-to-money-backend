@@ -29,6 +29,7 @@ class MypeController extends Controller
             'website' => $mypeProfile->website,
             'location' => $mypeProfile->location,
             'profile_photo' => $mypeProfile->profile_photo,
+            'photo_url' => $this->storageUrl($mypeProfile->profile_photo),
             'views_count' => $mypeProfile->views_count,
             'projects' => $mypeProfile->clientProjects
                 ->values()
@@ -46,5 +47,14 @@ class MypeController extends Controller
                     'created_at' => $project->created_at,
                 ]),
         ]);
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 }
