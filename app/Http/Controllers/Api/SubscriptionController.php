@@ -365,25 +365,46 @@ class SubscriptionController extends Controller
     private function isSuccessfulCulqiCharge(array $charge): bool
     {
         $object = data_get($charge, 'object');
+        $chargeId = (string) data_get($charge, 'id', '');
         $state = strtolower((string) data_get($charge, 'state', ''));
         $responseCode = strtolower((string) data_get($charge, 'response_code', ''));
         $status = strtolower((string) data_get($charge, 'status', ''));
+        $actionCode = strtolower((string) data_get($charge, 'action_code', ''));
+        $message = strtolower((string) (
+            data_get($charge, 'user_message')
+            ?? data_get($charge, 'merchant_message')
+            ?? data_get($charge, 'message')
+            ?? ''
+        ));
 
-        return ($object === null || $object === 'charge')
-            && (
-                $state === 'exitosa'
-                || $state === 'aprobada'
-                || $state === 'aprobado'
-                || $state === 'approved'
-                || $state === 'succeeded'
-                || $responseCode === 'venta_exitosa'
-                || str_contains($responseCode, 'exitosa')
-                || str_contains($responseCode, 'aprobada')
-                || str_contains($responseCode, 'aprobado')
-                || str_contains($responseCode, 'approved')
-                || $status === 'approved'
-                || $status === 'succeeded'
-            );
+        if (!($object === null || $object === 'charge')) {
+            return false;
+        }
+
+        $explicitFailure = collect([$state, $responseCode, $status, $actionCode, $message])
+            ->contains(fn (string $value) => str_contains($value, 'rechaz')
+                || str_contains($value, 'deneg')
+                || str_contains($value, 'fall')
+                || str_contains($value, 'failed')
+                || str_contains($value, 'declined')
+                || str_contains($value, 'error')
+                || str_contains($value, 'review')
+                || str_contains($value, 'autentic'));
+
+        if ($explicitFailure) {
+            return false;
+        }
+
+        $explicitSuccess = collect([$state, $responseCode, $status, $message])
+            ->contains(fn (string $value) => str_contains($value, 'exitosa')
+                || str_contains($value, 'exitoso')
+                || str_contains($value, 'aprobada')
+                || str_contains($value, 'aprobado')
+                || str_contains($value, 'approved')
+                || str_contains($value, 'succeeded')
+                || str_contains($value, 'venta_exitosa'));
+
+        return $explicitSuccess || str_starts_with($chargeId, 'chr_');
     }
 
     private function compactCulqiCharge(array $charge): array
