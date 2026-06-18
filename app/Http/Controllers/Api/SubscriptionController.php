@@ -18,8 +18,10 @@ class SubscriptionController extends Controller
 {
     use ApiResponse;
 
-    private const PRO_MONTHLY_PRICE = 29.00;
-    private const PRO_YEARLY_PRICE = 290.00;
+    private const PRO_MONTHLY_FREELANCER = 29.00;
+    private const PRO_YEARLY_FREELANCER = 290.00;
+    private const PRO_MONTHLY_MYPE = 49.00;
+    private const PRO_YEARLY_MYPE = 490.00;
 
     public function show(Request $request): JsonResponse
     {
@@ -66,7 +68,10 @@ class SubscriptionController extends Controller
         $user = $request->user();
         $method = $data['payment_method'];
         $cycle = $data['billing_cycle'];
-        $amount = $cycle === 'yearly' ? self::PRO_YEARLY_PRICE : self::PRO_MONTHLY_PRICE;
+        $isMype = ($user->user_type ?? $user->account_type) === 'mype';
+        $amount = $isMype
+            ? ($cycle === 'yearly' ? self::PRO_YEARLY_MYPE : self::PRO_MONTHLY_MYPE)
+            : ($cycle === 'yearly' ? self::PRO_YEARLY_FREELANCER : self::PRO_MONTHLY_FREELANCER);
         $details = $data['payment_details'];
 
         if ($method === 'card' && filled($details['culqi_token'] ?? null)) {
