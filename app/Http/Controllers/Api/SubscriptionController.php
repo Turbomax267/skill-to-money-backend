@@ -336,10 +336,11 @@ class SubscriptionController extends Controller
 
     private function isSuccessfulCulqiCharge(array $charge): bool
     {
+        $object = data_get($charge, 'object');
         $state = strtolower((string) data_get($charge, 'state', ''));
         $responseCode = strtolower((string) data_get($charge, 'response_code', ''));
 
-        return data_get($charge, 'object') === 'charge'
+        return ($object === null || $object === 'charge')
             && (
                 $state === 'exitosa'
                 || $responseCode === 'venta_exitosa'
