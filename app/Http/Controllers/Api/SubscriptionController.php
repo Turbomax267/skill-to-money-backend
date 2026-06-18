@@ -54,6 +54,13 @@ class SubscriptionController extends Controller
             'payment_details.phone' => ['nullable', 'string', 'max:20'],
             'payment_details.culqi_token' => ['nullable', 'string', 'max:120'],
             'payment_details.culqi_email' => ['nullable', 'email', 'max:160'],
+            'payment_details.device_finger_print_id' => ['nullable', 'string', 'max:120'],
+            'payment_details.authentication_3ds' => ['nullable', 'array'],
+            'payment_details.authentication_3ds.eci' => ['nullable', 'string', 'max:30'],
+            'payment_details.authentication_3ds.xid' => ['nullable', 'string', 'max:255'],
+            'payment_details.authentication_3ds.cavv' => ['nullable', 'string', 'max:255'],
+            'payment_details.authentication_3ds.protocolVersion' => ['nullable', 'string', 'max:30'],
+            'payment_details.authentication_3ds.directoryServerTransactionId' => ['nullable', 'string', 'max:255'],
         ]);
 
         $user = $request->user();
@@ -156,7 +163,7 @@ class SubscriptionController extends Controller
         ]);
 
         try {
-            $charge = app(CulqiService::class)->charge([
+            $chargePayload = [
                 'amount' => (int) round($amount * 100),
                 'currency_code' => 'PEN',
                 'email' => $details['culqi_email'] ?? $user->email,
@@ -170,7 +177,28 @@ class SubscriptionController extends Controller
                     'plan' => 'pro',
                     'billing_cycle' => $cycle,
                 ],
-            ]);
+            ];
+
+            if (filled($details['device_finger_print_id'] ?? null)) {
+                $chargePayload['antifraud_details'] = [
+                    'first_name' => $user->first_name ?? $user->name,
+                    'last_name' => $user->last_name ?? $user->name,
+                    'email' => $details['culqi_email'] ?? $user->email,
+                    'device_finger_print_id' => $details['device_finger_print_id'],
+                ];
+            }
+
+            if (! empty($details['authentication_3ds']) && is_array($details['authentication_3ds'])) {
+                $chargePayload['authentication_3DS'] = array_filter([
+                    'eci' => data_get($details, 'authentication_3ds.eci'),
+                    'xid' => data_get($details, 'authentication_3ds.xid'),
+                    'cavv' => data_get($details, 'authentication_3ds.cavv'),
+                    'protocolVersion' => data_get($details, 'authentication_3ds.protocolVersion'),
+                    'directoryServerTransactionId' => data_get($details, 'authentication_3ds.directoryServerTransactionId'),
+                ], static fn ($value) => filled($value));
+            }
+
+            $charge = app(CulqiService::class)->charge($chargePayload);
         } catch (\Throwable $exception) {
             $payment->forceFill([
                 'status' => 'failed',
