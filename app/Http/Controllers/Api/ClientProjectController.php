@@ -196,8 +196,18 @@ class ClientProjectController extends Controller
             'website' => $profile?->website,
             'location' => $profile?->location,
             'profile_photo' => $profile?->profile_photo,
+            'photo_url' => $this->storageUrl($profile?->profile_photo),
             'views_count' => $profile?->views_count,
         ];
+    }
+
+    private function storageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 }
 
