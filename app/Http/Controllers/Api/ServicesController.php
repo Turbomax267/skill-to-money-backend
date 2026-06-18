@@ -32,19 +32,20 @@ class ServicesController extends Controller
             ->with(['freelancer.user', 'freelancer.skills', 'category'])
             ->whereIn('status', ['active', 'published'])
             ->whereHas('freelancer.user', fn($q) => $q->where('user_type', 'freelancer'));
+        $like = $this->likeOperator();
 
         if ($search = $validated['search'] ?? null) {
-            $query->where(function ($q) use ($search): void {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhereHas('category', fn($cq) => $cq->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('freelancer.user', fn($uq) => $uq->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('freelancer.skills', fn($sq) => $sq->where('name', 'like', "%{$search}%"));
+            $query->where(function ($q) use ($search, $like): void {
+                $q->where('title', $like, "%{$search}%")
+                    ->orWhere('description', $like, "%{$search}%")
+                    ->orWhereHas('category', fn($cq) => $cq->where('name', $like, "%{$search}%"))
+                    ->orWhereHas('freelancer.user', fn($uq) => $uq->where('name', $like, "%{$search}%"))
+                    ->orWhereHas('freelancer.skills', fn($sq) => $sq->where('name', $like, "%{$search}%"));
             });
         }
 
         if ($category = $validated['category'] ?? null) {
-            $query->whereHas('category', fn($q) => $q->where('name', 'like', "%{$category}%"));
+            $query->whereHas('category', fn($q) => $q->where('name', $like, "%{$category}%"));
         }
 
         if (isset($validated['min_price'])) {
@@ -132,5 +133,10 @@ class ServicesController extends Controller
         }
 
         return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
+    }
+
+    private function likeOperator(): string
+    {
+        return config('database.default') === 'pgsql' ? 'ilike' : 'like';
     }
 }

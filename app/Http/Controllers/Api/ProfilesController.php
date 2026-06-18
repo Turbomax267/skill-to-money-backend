@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Skill;
+use App\Services\ProfileScoringService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -12,6 +13,10 @@ use Illuminate\Support\Str;
 class ProfilesController extends Controller
 {
     use ApiResponse;
+
+    public function __construct(private readonly ProfileScoringService $scoring)
+    {
+    }
 
     private const SKILL_GROUP_PREFIXES = [
         'skills' => 'habilidades/',
@@ -197,6 +202,11 @@ class ProfilesController extends Controller
         }
 
         $profile = $user->freelancerProfile;
+        $visibility = $profile ? $this->scoring->visibility($profile) : null;
+
+        if ($profile && (float) $profile->visibility_score !== (float) ($visibility['score'] ?? 0)) {
+            $profile->forceFill(['visibility_score' => $visibility['score']])->save();
+        }
 
         return [
             'id' => $profile?->id,
@@ -215,7 +225,8 @@ class ProfilesController extends Controller
             'availability_status' => $profile?->availability_status,
             'rating' => $profile?->rating,
             'completed_jobs' => $profile?->completed_jobs,
-            'visibility_score' => $profile?->visibility_score,
+            'visibility_score' => $visibility['score'] ?? $profile?->visibility_score,
+            'visibility' => $visibility,
             'profile_photo' => $profile?->profile_photo,
             'photo_url' => $this->storageUrl($profile?->profile_photo),
             'gemini_analysis' => $profile?->gemini_analysis,

@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\FreelancerProfile;
 use App\Models\PortfolioProject;
 use App\Models\Service;
+use App\Services\ProfileScoringService;
 use App\Services\ViewCounter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,10 @@ use Illuminate\Support\Facades\Storage;
 class CatalogController extends Controller
 {
     use ApiResponse;
+
+    public function __construct(private readonly ProfileScoringService $scoring)
+    {
+    }
 
     public function index(Request $request): JsonResponse
     {
@@ -37,28 +42,41 @@ class CatalogController extends Controller
         $query = FreelancerProfile::query()
             ->with(['user', 'skills'])
             ->whereHas('user', fn($q) => $q->where('user_type', 'freelancer'));
+        $like = $this->likeOperator();
 
         if ($search = $validated['search'] ?? null) {
-            $query->where(function ($q) use ($search): void {
-                $q->where('headline', 'like', "%{$search}%")
-                    ->orWhere('category', 'like', "%{$search}%")
-                    ->orWhere('bio', 'like', "%{$search}%")
-                    ->orWhere('location', 'like', "%{$search}%")
-                    ->orWhereHas('user', fn($uq) => $uq->where('name', 'like', "%{$search}%"))
-                    ->orWhereHas('skills', fn($sk) => $sk->where('name', 'like', "%{$search}%"));
+            $query->where(function ($q) use ($search, $like): void {
+                $q->where('headline', $like, "%{$search}%")
+                    ->orWhere('category', $like, "%{$search}%")
+                    ->orWhere('bio', $like, "%{$search}%")
+                    ->orWhere('location', $like, "%{$search}%")
+                    ->orWhereHas('user', fn($uq) => $uq->where('name', $like, "%{$search}%"))
+                    ->orWhereHas('skills', fn($sk) => $sk->where('name', $like, "%{$search}%"));
             });
         }
 
         if ($category = $validated['category'] ?? null) {
-            $query->where('category', 'like', "%{$category}%");
+            $terms = $this->categoryTerms($category);
+
+            $query->where(function ($q) use ($terms, $like): void {
+                foreach ($terms as $term) {
+                    $q->orWhere('category', $like, "%{$term}%")
+                        ->orWhere('experience_area', $like, "%{$term}%")
+                        ->orWhere('headline', $like, "%{$term}%")
+                        ->orWhereHas('skills', function ($skillQuery) use ($term, $like): void {
+                            $skillQuery->where('name', $like, "%{$term}%")
+                                ->orWhere('category', $like, "%{$term}%");
+                        });
+                }
+            });
         }
 
         if ($location = $validated['location'] ?? null) {
-            $query->where('location', 'like', "%{$location}%");
+            $query->where('location', $like, "%{$location}%");
         }
 
         if ($skill = $validated['skill'] ?? null) {
-            $query->whereHas('skills', fn($q) => $q->where('name', 'like', "%{$skill}%"));
+            $query->whereHas('skills', fn($q) => $q->where('name', $like, "%{$skill}%"));
         }
 
         if (isset($validated['min_rating'])) {
@@ -180,6 +198,7 @@ class CatalogController extends Controller
     private function formatFreelancer(FreelancerProfile $profile): array
     {
         $user = $profile->user;
+        $visibility = $this->scoring->visibility($profile);
 
         return [
             'id' => $profile->id,
@@ -201,6 +220,8 @@ class CatalogController extends Controller
             'skills' => $profile->skills->pluck('name'),
             'availability_status' => $profile->availability_status,
             'views_count' => $profile->views_count,
+            'visibility_score' => $visibility['score'],
+            'visibility_level' => $visibility['level'],
             'created_at' => $profile->created_at,
         ];
     }
@@ -234,5 +255,39 @@ class CatalogController extends Controller
         }
 
         return (float) str_replace(',', '.', $matches[0]);
+    }
+
+    private function likeOperator(): string
+    {
+        return config('database.default') === 'pgsql' ? 'ilike' : 'like';
+    }
+
+    private function categoryTerms(string $category): array
+    {
+        $normalized = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], trim($category)));
+
+        $aliases = match ($normalized) {
+            'ux/ui', 'diseno ux/ui', 'diseño ux/ui' => [
+                $category,
+                'UX/UI',
+                'UX',
+                'UI',
+                'Diseño UX',
+                'Experiencia de usuario',
+                'User Experience',
+                'Interfaz de usuario',
+            ],
+            'ia y automatizacion', 'ia y automatización', 'skill bot & automatizacion', 'skill bot & automatización' => [
+                $category,
+                'Automatización',
+                'Inteligencia artificial',
+                'Skill Bot',
+                'Make',
+                'n8n',
+            ],
+            default => [$category],
+        };
+
+        return array_values(array_unique(array_filter(array_map('trim', $aliases))));
     }
 }

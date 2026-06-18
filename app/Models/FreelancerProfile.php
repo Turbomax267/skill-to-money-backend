@@ -63,4 +63,14 @@ class FreelancerProfile extends Model
     {
         return $this->hasMany(PortfolioProject::class);
     }
+
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(Contract::class);
+    }
+
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(Delivery::class);
+    }
 }

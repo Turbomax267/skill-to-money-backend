@@ -40,4 +40,9 @@ class ClientProject extends Model
     {
         return $this->belongsTo(MypeProfile::class);
     }
+
+    public function contracts(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Contract::class);
+    }
 }

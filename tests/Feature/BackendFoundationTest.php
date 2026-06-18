@@ -4,14 +4,20 @@ namespace Tests\Feature;
 
 use App\Mail\WelcomeAccountMail;
 use App\Models\Category;
+use App\Models\ClientProject;
 use App\Models\Conversation;
+use App\Models\FreelancerProfile;
 use App\Models\Notification;
 use App\Models\Service;
 use App\Models\Skill;
+use App\Models\Subscription;
 use App\Models\User;
+use App\Services\ProfileScoringService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class BackendFoundationTest extends TestCase
@@ -148,6 +154,198 @@ class BackendFoundationTest extends TestCase
             'business_name' => 'SKILL TO MONEY S.A.C.',
             'ruc' => '20601234567',
         ]);
+    }
+
+    public function test_mype_can_upgrade_to_pro_with_demo_checkout_and_create_more_projects(): void
+    {
+        config(['services.peru_api.key' => 'fake-key']);
+
+        Http::fake([
+            'https://peruapi.com/api/ruc/20600000001*' => Http::response([
+                'ruc' => '20600000001',
+                'razon_social' => 'CLIENTE PRO S.A.C.',
+                'estado' => 'ACTIVO',
+                'condicion' => 'HABIDO',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'SAN ISIDRO',
+                'mensaje' => 'OK',
+                'code' => '200',
+            ]),
+        ]);
+
+        $register = $this->postJson('/api/auth/register/mype', [
+            'company_name' => 'Cliente Pro',
+            'ruc' => '20600000001',
+            'email' => 'cliente.pro@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $token = $register->json('data.access_token');
+
+        $this->withToken($token)->getJson('/api/subscription')
+            ->assertOk()
+            ->assertJsonPath('data.plan', 'free');
+
+        $this->withToken($token)->postJson('/api/client/projects', [
+            'title' => 'Landing comercial',
+            'category' => 'Desarrollo web',
+            'description' => 'Necesito una landing para presentar servicios.',
+            'budget_min' => 300,
+            'budget_max' => 500,
+            'expected_delivery_days' => 7,
+            'status' => 'published',
+            'progress' => 0,
+            'ai_generated' => false,
+        ])->assertCreated();
+
+        $this->withToken($token)->postJson('/api/client/projects', [
+            'title' => 'Dashboard de ventas',
+            'category' => 'Excel',
+            'description' => 'Necesito un dashboard para ventas mensuales.',
+            'budget_min' => 200,
+            'budget_max' => 350,
+            'expected_delivery_days' => 5,
+            'status' => 'published',
+            'progress' => 0,
+            'ai_generated' => false,
+        ])->assertForbidden();
+
+        $this->withToken($token)->postJson('/api/subscription/checkout', [
+            'plan' => 'pro',
+            'billing_cycle' => 'monthly',
+            'payment_method' => 'card',
+            'payment_details' => [
+                'card_number' => '4747 4747 4747 4747',
+                'card_holder' => 'Cliente Pro',
+                'expiry_month' => 12,
+                'expiry_year' => 2028,
+                'cvv' => '123',
+            ],
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.plan', 'pro')
+            ->assertJsonPath('data.payment.card_brand', 'Visa')
+            ->assertJsonPath('data.payment.card_last_four', '4747');
+
+        $this->assertDatabaseHas('subscriptions', [
+            'user_id' => $register->json('data.user.id'),
+            'plan' => 'pro',
+            'status' => 'active',
+        ]);
+
+        $this->assertDatabaseHas('subscription_payments', [
+            'user_id' => $register->json('data.user.id'),
+            'payment_method' => 'card',
+            'card_brand' => 'Visa',
+            'card_last_four' => '4747',
+            'status' => 'succeeded',
+        ]);
+
+        $this->withToken($token)->postJson('/api/client/projects', [
+            'title' => 'Dashboard de ventas',
+            'category' => 'Excel',
+            'description' => 'Necesito un dashboard para ventas mensuales.',
+            'budget_min' => 200,
+            'budget_max' => 350,
+            'expected_delivery_days' => 5,
+            'status' => 'published',
+            'progress' => 0,
+            'ai_generated' => false,
+        ])->assertCreated();
+    }
+
+    public function test_subscription_checkout_uses_culqi_token_and_webhook_is_idempotent(): void
+    {
+        Mail::fake();
+        config([
+            'services.peru_api.key' => 'fake-key',
+            'services.culqi.private_key' => 'sk_test_fake',
+        ]);
+
+        Http::fake([
+            'https://peruapi.com/api/ruc/20609998887*' => Http::response([
+                'ruc' => '20609998887',
+                'razon_social' => 'CULQI MYPE S.A.C.',
+                'estado' => 'ACTIVO',
+                'condicion' => 'HABIDO',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'MIRAFLORES',
+                'mensaje' => 'OK',
+                'code' => '200',
+            ]),
+            'https://api.culqi.com/v2/charges' => Http::response([
+                'object' => 'charge',
+                'id' => 'chr_test_skillpro',
+                'amount' => 2900,
+                'currency' => 'PEN',
+                'response_code' => 'venta_exitosa',
+                'state' => 'Exitosa',
+                'merchant_message' => 'La operacion de venta ha sido autorizada exitosamente',
+                'user_message' => 'Su compra ha sido exitosa.',
+                'source' => [
+                    'object' => 'token',
+                    'id' => 'tkn_test_skillpro',
+                    'last_four' => '1111',
+                    'iin' => [
+                        'card_brand' => 'Visa',
+                    ],
+                ],
+            ]),
+        ]);
+
+        $mype = $this->postJson('/api/auth/register/mype', [
+            'company_name' => 'Culqi MYPE',
+            'ruc' => '20609998887',
+            'email' => 'culqi.mype@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $token = $mype->json('data.access_token');
+
+        $checkout = $this->withToken($token)->postJson('/api/subscription/checkout', [
+            'plan' => 'pro',
+            'billing_cycle' => 'monthly',
+            'payment_method' => 'card',
+            'save_payment_method' => true,
+            'payment_details' => [
+                'culqi_token' => 'tkn_test_skillpro',
+                'culqi_email' => 'culqi.mype@gmail.com',
+            ],
+        ]);
+
+        $checkout->assertCreated()
+            ->assertJsonPath('data.plan', 'pro')
+            ->assertJsonPath('data.payment.reference', 'chr_test_skillpro')
+            ->assertJsonPath('data.payment.card_brand', 'Visa')
+            ->assertJsonPath('data.payment.card_last_four', '1111');
+
+        Http::assertSent(fn ($request) =>
+            $request->url() === 'https://api.culqi.com/v2/charges'
+            && $request->hasHeader('Authorization', 'Bearer sk_test_fake')
+            && ($request['amount'] ?? null) === 2900
+            && ($request['source_id'] ?? null) === 'tkn_test_skillpro'
+            && ($request['metadata']['plan'] ?? null) === 'pro'
+        );
+
+        $this->postJson('/api/webhooks/culqi', [
+            'type' => 'charge.creation.succeeded',
+            'data' => [
+                'object' => [
+                    'object' => 'charge',
+                    'id' => 'chr_test_skillpro',
+                    'state' => 'Exitosa',
+                    'response_code' => 'venta_exitosa',
+                    'source' => [
+                        'last_four' => '1111',
+                        'iin' => ['card_brand' => 'Visa'],
+                    ],
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(1, Subscription::where('user_id', $mype->json('data.user.id'))->where('status', 'active')->count());
     }
 
     public function test_gemini_analysis_sends_compact_safe_payload_and_updates_profile(): void
@@ -496,6 +694,26 @@ class BackendFoundationTest extends TestCase
                 'location' => 'Arequipa',
             ]);
 
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Sofia',
+            'last_name' => 'Molina',
+            'dni' => '77889900',
+            'email' => 'sofia.catalog@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $uxFreelancer = User::where('email', 'sofia.catalog@gmail.com')
+            ->firstOrFail()
+            ->freelancerProfile;
+
+        $uxFreelancer->update([
+            'headline' => 'Diseñadora de interfaces digitales',
+            'category' => null,
+            'experience_area' => 'Diseño UX/UI',
+            'suggested_rate' => 'S/ 70',
+            'location' => 'Lima',
+        ]);
+
         $mype = $this->postJson('/api/auth/register/mype', [
             'first_name' => 'Lucia',
             'last_name' => 'Torres',
@@ -513,6 +731,12 @@ class BackendFoundationTest extends TestCase
             ->assertJsonPath('data.total', 1)
             ->assertJsonPath('data.freelancers.0.id', $freelancer->id)
             ->assertJsonPath('data.freelancers.0.rate_amount', 35);
+
+        $this->withToken($mypeToken)->getJson('/api/catalog?category=UX%2FUI')
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.total', 1)
+            ->assertJsonPath('data.freelancers.0.id', $uxFreelancer->id);
 
         $this->withToken($mypeToken)->postJson('/api/favorites', [
             'freelancer_profile_id' => $freelancer->id,
@@ -610,8 +834,169 @@ class BackendFoundationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.recommendations.0.id', $recommended->id)
-            ->assertJsonPath('data.recommendations.0.score', 100)
-            ->assertJsonPath('data.recommendations.0.reasons.0', 'Coincide con la categoria solicitada.');
+            ->assertJsonPath('data.recommendations.0.score', 99.6)
+            ->assertJsonPath('data.recommendations.0.compatibility_breakdown.skills.points', 40)
+            ->assertJsonPath('data.recommendations.0.compatibility_breakdown.category.points', 20)
+            ->assertJsonPath('data.recommendations.0.compatibility_breakdown.rating.points', 19.6)
+            ->assertJsonPath('data.recommendations.0.compatibility_breakdown.experience.points', 20)
+            ->assertJsonPath('data.recommendations.0.reasons.0', 'Habilidades coincidentes: Edicion de videos');
+    }
+
+    public function test_project_recommendations_exclude_zero_score_and_empty_profiles(): void
+    {
+        config(['services.peru_api.key' => 'fake-key']);
+
+        Http::fake([
+            'https://peruapi.com/api/ruc/20603334446*' => Http::response([
+                'ruc' => '20603334446',
+                'razon_social' => 'WEB MATCH MYPE S.A.C.',
+                'estado' => 'ACTIVO',
+                'condicion' => 'HABIDO',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'SURCO',
+                'mensaje' => 'OK',
+                'code' => '200',
+            ]),
+        ]);
+
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Luis Santiago',
+            'last_name' => 'De Blas',
+            'dni' => '44556677',
+            'email' => 'santiago.webmatch@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $webFreelancer = User::where('email', 'santiago.webmatch@gmail.com')
+            ->firstOrFail()
+            ->freelancerProfile;
+
+        $webFreelancer->update([
+            'headline' => 'Desarrollador Frontend con Enfoque en Backend',
+            'category' => 'Desarrollo Web',
+            'bio' => 'Construyo paginas web, interfaces responsivas y conexiones con backend para negocios.',
+            'suggested_rate' => 'S/ 300 por proyecto',
+        ]);
+
+        $react = Skill::create(['name' => 'React', 'category' => 'Desarrollo Web']);
+        $javascript = Skill::create(['name' => 'JavaScript', 'category' => 'Desarrollo Web']);
+        $webFreelancer->skills()->attach([$react->id, $javascript->id]);
+
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Melanie',
+            'last_name' => 'Cubillas',
+            'dni' => '55667788',
+            'email' => 'melanie.webmatch@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $uxFreelancer = User::where('email', 'melanie.webmatch@gmail.com')
+            ->firstOrFail()
+            ->freelancerProfile;
+
+        $uxFreelancer->update([
+            'headline' => 'Disenadora UX/UI y Analista de Datos Junior',
+            'category' => 'UX/UI',
+            'bio' => 'Diseno flujos de usuario y analizo datos para mejorar experiencias digitales.',
+        ]);
+
+        $figma = Skill::create(['name' => 'Figma', 'category' => 'UX/UI']);
+        $uxFreelancer->skills()->attach($figma->id);
+
+        $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Daniela',
+            'last_name' => 'Torres',
+            'dni' => '66778899',
+            'email' => 'daniela.webmatch@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $mype = $this->postJson('/api/auth/register/mype', [
+            'company_name' => 'Web Match MYPE',
+            'ruc' => '20603334446',
+            'email' => 'web.match.mype@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $project = ClientProject::create([
+            'mype_profile_id' => User::where('email', 'web.match.mype@gmail.com')->firstOrFail()->mypeProfile->id,
+            'title' => 'Crear una pagina web para mi negocio',
+            'category' => 'Desarrollo Web',
+            'description' => 'Necesito una web informativa con formulario de contacto.',
+            'budget_min' => 200,
+            'budget_max' => 500,
+            'status' => 'published',
+        ]);
+
+        $response = $this->withToken($mype->json('data.access_token'))
+            ->getJson("/api/recommendations?type=freelancer&project_id={$project->id}&limit=5")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.recommendations')
+            ->assertJsonPath('data.recommendations.0.id', $webFreelancer->id);
+
+        $ids = collect($response->json('data.recommendations'))->pluck('id')->all();
+
+        $this->assertGreaterThan(0, $response->json('data.recommendations.0.score'));
+        $this->assertNotContains($uxFreelancer->id, $ids);
+        $this->assertNotContains(User::where('email', 'daniela.webmatch@gmail.com')->firstOrFail()->freelancerProfile->id, $ids);
+    }
+
+    public function test_profile_scoring_understands_common_service_aliases(): void
+    {
+        $scoring = app(ProfileScoringService::class);
+
+        $cases = [
+            [
+                'profile_category' => 'Edicion de Video',
+                'headline' => 'Editor de reels para negocios',
+                'skill' => 'CapCut',
+                'search' => 'Necesito videos cortos para TikTok y Reels',
+                'category' => 'Video',
+            ],
+            [
+                'profile_category' => 'Analisis de Datos',
+                'headline' => 'Dashboards en Excel y Power BI',
+                'skill' => 'Excel',
+                'search' => 'Necesito reportes con tablas y dashboard',
+                'category' => 'Datos',
+            ],
+            [
+                'profile_category' => 'Diseno Grafico',
+                'headline' => 'Ilustrador para marcas y personajes',
+                'skill' => 'Illustrator',
+                'search' => 'Necesito un dibujo para logo de marca',
+                'category' => 'Dibujo',
+            ],
+        ];
+
+        foreach ($cases as $index => $case) {
+            $user = User::factory()->create([
+                'email' => "alias.match{$index}@example.com",
+                'user_type' => 'freelancer',
+            ]);
+
+            $profile = FreelancerProfile::create([
+                'user_id' => $user->id,
+                'dni' => '88' . str_pad((string) $index, 6, '0', STR_PAD_LEFT),
+                'experience_area' => $case['profile_category'],
+                'headline' => $case['headline'],
+                'category' => $case['profile_category'],
+                'bio' => 'Perfil con experiencia relacionada al servicio solicitado.',
+            ]);
+
+            $skill = Skill::create(['name' => $case['skill'], 'category' => $case['profile_category']]);
+            $profile->skills()->attach($skill->id);
+
+            $result = $scoring->compatibility($profile, [
+                'search' => $case['search'],
+                'category' => $case['category'],
+            ]);
+
+            $this->assertGreaterThan(0, $result['score']);
+            $this->assertContains($case['skill'], $result['breakdown']['skills']['matched']);
+            $this->assertTrue($result['breakdown']['category']['matched']);
+        }
     }
 
     public function test_mype_can_explore_published_freelancer_services_with_filters(): void
@@ -781,5 +1166,119 @@ class BackendFoundationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonCount(2, 'data.messages');
+    }
+
+    public function test_contract_escrow_delivery_approval_and_withdrawal_flow(): void
+    {
+        Mail::fake();
+        Storage::fake('local');
+        config(['services.peru_api.key' => 'fake-key']);
+
+        Http::fake([
+            'https://peruapi.com/api/ruc/20601112223*' => Http::response([
+                'ruc' => '20601112223',
+                'razon_social' => 'ESCROW MYPE S.A.C.',
+                'estado' => 'ACTIVO',
+                'condicion' => 'HABIDO',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'MIRAFLORES',
+                'mensaje' => 'OK',
+                'code' => '200',
+            ]),
+        ]);
+
+        $freelancerResponse = $this->postJson('/api/auth/register/freelancer', [
+            'first_name' => 'Laura',
+            'last_name' => 'Perez',
+            'dni' => '77889900',
+            'email' => 'laura.escrow@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $mypeResponse = $this->postJson('/api/auth/register/mype', [
+            'company_name' => 'Escrow MYPE',
+            'ruc' => '20601112223',
+            'email' => 'escrow.mype@gmail.com',
+            'password' => 'password123',
+        ])->assertCreated();
+
+        $freelancerToken = $freelancerResponse->json('data.access_token');
+        $mypeToken = $mypeResponse->json('data.access_token');
+        $freelancerProfile = User::where('email', 'laura.escrow@gmail.com')->firstOrFail()->freelancerProfile;
+
+        $category = Category::create([
+            'name' => 'Diseño Grafico',
+            'description' => 'Servicios de diseño',
+            'status' => 'active',
+        ]);
+
+        $service = Service::create([
+            'freelancer_profile_id' => $freelancerProfile->id,
+            'category_id' => $category->id,
+            'title' => 'Diseño de identidad visual',
+            'description' => 'Logo, paleta y manual basico.',
+            'price' => 120,
+            'currency' => 'PEN',
+            'delivery_days' => 7,
+            'status' => 'active',
+        ]);
+
+        $contract = $this->withToken($mypeToken)->postJson('/api/contracts', [
+            'freelancer_profile_id' => $freelancerProfile->id,
+            'service_id' => $service->id,
+            'title' => 'Identidad visual para cafeteria',
+            'description' => 'Contrato de diseño con revision.',
+            'amount' => 120,
+            'currency' => 'PEN',
+        ])->assertCreated()
+            ->assertJsonPath('data.status', 'pending_payment');
+
+        $contractId = $contract->json('data.id');
+
+        $this->withToken($mypeToken)->postJson("/api/contracts/{$contractId}/mock-pay")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress')
+            ->assertJsonPath('data.payment.status', 'paid')
+            ->assertJsonPath('data.escrow.status', 'held');
+
+        $delivery = $this->withToken($freelancerToken)->post("/api/contracts/{$contractId}/deliver", [
+            'message' => 'Envio preview y archivo final bloqueado.',
+            'preview_files' => [
+                UploadedFile::fake()->create('preview.pdf', 20, 'application/pdf'),
+            ],
+            'final_files' => [
+                UploadedFile::fake()->create('final.zip', 20, 'application/zip'),
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'submitted_for_review');
+
+        $finalFileId = collect($delivery->json('data.deliveries.0.files'))
+            ->firstWhere('is_final', true)['id'];
+
+        $this->withToken($mypeToken)->getJson("/api/contracts/{$contractId}/files/{$finalFileId}/download")
+            ->assertForbidden();
+
+        $this->withToken($mypeToken)->postJson("/api/contracts/{$contractId}/approve")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved')
+            ->assertJsonPath('data.escrow.status', 'released');
+
+        $this->withToken($mypeToken)->get("/api/contracts/{$contractId}/files/{$finalFileId}/download")
+            ->assertOk();
+
+        $this->withToken($freelancerToken)->getJson('/api/wallet')
+            ->assertOk()
+            ->assertJsonPath('data.wallet.available_balance', 120);
+
+        $this->withToken($freelancerToken)->postJson('/api/wallet/withdrawals', [
+            'amount' => 40,
+        ])->assertUnprocessable();
+
+        $this->withToken($freelancerToken)->postJson('/api/wallet/withdrawals', [
+            'amount' => 50,
+            'destination' => 'Yape mock',
+        ])->assertCreated()
+            ->assertJsonPath('data.wallet.available_balance', 70);
     }
 }

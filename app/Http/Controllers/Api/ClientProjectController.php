@@ -71,12 +71,14 @@ class ClientProjectController extends Controller
             ->get()
             ->map(fn (ClientProject $project): array => $this->payload($project));
 
+        $isPro = $request->user()->hasProSubscription();
+
         return $this->success('Client projects loaded.', [
             'projects' => $projects,
             'limits' => [
-                'plan' => 'free',
-                'max_projects' => 1,
-                'can_create' => $projects->count() < 1,
+                'plan' => $isPro ? 'pro' : 'free',
+                'max_projects' => $isPro ? null : 1,
+                'can_create' => $isPro || $projects->count() < 1,
             ],
         ]);
     }
@@ -89,7 +91,7 @@ class ClientProjectController extends Controller
             return $this->error('MYPE profile not found.', ['profile' => ['Perfil MYPE no encontrado.']], 404);
         }
 
-        if ($profile->clientProjects()->count() >= 1) {
+        if (! $request->user()->hasProSubscription() && $profile->clientProjects()->count() >= 1) {
             return $this->error(
                 'El plan Free permite publicar solo 1 proyecto. Actualiza a Pro para crear más publicaciones.',
                 ['plan' => ['Actualiza a Pro para crear más de 1 proyecto.']],

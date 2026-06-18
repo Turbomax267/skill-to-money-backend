@@ -6,13 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\ClientProject;
 use App\Models\FreelancerProfile;
+use App\Models\MatchResult;
+use App\Services\ProfileScoringService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class RecommendationController extends Controller
 {
     use ApiResponse;
+
+    public function __construct(private readonly ProfileScoringService $scoring)
+    {
+    }
 
     public function index(Request $request): JsonResponse
     {
@@ -22,10 +27,13 @@ class RecommendationController extends Controller
             'search' => 'nullable|string|max:120',
             'category' => 'nullable|string|max:100',
             'skill' => 'nullable|string|max:100',
+            'min_rate' => 'nullable|numeric|min:0',
             'max_rate' => 'nullable|numeric|min:0',
             'min_rating' => 'nullable|numeric|min:0|max:5',
             'limit' => 'nullable|integer|min:1|max:10',
         ]);
+
+        $project = null;
 
         if (isset($validated['project_id'])) {
             $project = ClientProject::query()->findOrFail($validated['project_id']);
@@ -36,27 +44,30 @@ class RecommendationController extends Controller
 
             $validated['search'] = trim($project->title . ' ' . $project->description);
             $validated['category'] = $project->category ?? ($validated['category'] ?? null);
+            $validated['min_rate'] = $project->budget_min ?? ($validated['min_rate'] ?? null);
+            $validated['max_rate'] = $project->budget_max ?? ($validated['max_rate'] ?? null);
         }
 
         $limit = (int) ($validated['limit'] ?? 6);
         $profiles = FreelancerProfile::query()
-            ->with(['user', 'skills'])
+            ->with(['user', 'skills', 'portfolioProjects', 'services'])
             ->whereHas('user', fn($q) => $q->where('user_type', 'freelancer'))
             ->get()
-            ->map(fn(FreelancerProfile $profile) => $this->scoreProfile($profile, $validated))
+            ->filter(fn(FreelancerProfile $profile) => $this->hasRecommendableProfile($profile))
+            ->map(fn(FreelancerProfile $profile) => $this->scoreProfile($profile, $validated, $project))
             ->filter(fn(array $item) => $item['score'] > 0)
             ->sortByDesc('score')
             ->take($limit)
             ->values();
 
-        if ($profiles->isEmpty()) {
+        if ($profiles->isEmpty() && ! $this->hasSpecificRecommendationContext($validated)) {
             $profiles = FreelancerProfile::query()
-                ->with(['user', 'skills'])
+                ->with(['user', 'skills', 'portfolioProjects', 'services'])
                 ->whereHas('user', fn($q) => $q->where('user_type', 'freelancer'))
-                ->orderByDesc('rating')
-                ->orderByDesc('completed_jobs')
-                ->limit($limit)
                 ->get()
+                ->filter(fn(FreelancerProfile $profile) => $this->hasRecommendableProfile($profile))
+                ->sortByDesc(fn(FreelancerProfile $profile) => ((float) $profile->rating * 100) + (int) $profile->completed_jobs)
+                ->take($limit)
                 ->map(fn(FreelancerProfile $profile) => $this->fallbackProfile($profile))
                 ->values();
         }
@@ -66,69 +77,25 @@ class RecommendationController extends Controller
         ]);
     }
 
-    private function scoreProfile(FreelancerProfile $profile, array $filters): array
+    private function scoreProfile(FreelancerProfile $profile, array $filters, ?ClientProject $project = null): array
     {
-        $score = 0;
-        $reasons = [];
-        $search = $this->normalize($filters['search'] ?? '');
-        $category = $this->normalize($filters['category'] ?? '');
-        $skill = $this->normalize($filters['skill'] ?? '');
+        $compatibility = $this->scoring->compatibility($profile, $filters, $project);
         $skills = $profile->skills->pluck('name')->values();
-        $skillText = $this->normalize($skills->implode(' '));
-        $profileText = $this->normalize(implode(' ', [
-            $profile->headline,
-            $profile->category,
-            $profile->bio,
-            $profile->experience_area,
-            $profile->user?->name,
-            $skillText,
-        ]));
+        $rate = $this->scoring->parseRate($profile->suggested_rate);
 
-        if ($category !== '' && str_contains($this->normalize((string) $profile->category), $category)) {
-            $score += 35;
-            $reasons[] = 'Coincide con la categoria solicitada.';
-        }
-
-        if ($skill !== '' && str_contains($skillText, $skill)) {
-            $score += 30;
-            $reasons[] = 'Tiene habilidades relacionadas.';
-        }
-
-        if ($search !== '') {
-            foreach ($this->terms($search) as $term) {
-                if (str_contains($profileText, $term)) {
-                    $score += 8;
-                }
-            }
-
-            if ($score > 0) {
-                $reasons[] = 'Su perfil coincide con tu busqueda.';
-            }
-        }
-
-        $rate = $this->parseRate($profile->suggested_rate);
-        if (isset($filters['max_rate']) && $rate !== null && $rate <= (float) $filters['max_rate']) {
-            $score += 15;
-            $reasons[] = 'Se ajusta al presupuesto indicado.';
-        }
-
-        $rating = (float) $profile->rating;
-        if (isset($filters['min_rating']) && $rating >= (float) $filters['min_rating']) {
-            $score += 15;
-            $reasons[] = 'Cumple la reputacion minima.';
-        } elseif ($rating >= 4.5) {
-            $score += 10;
-            $reasons[] = 'Tiene buena reputacion.';
-        }
-
-        if ($profile->completed_jobs > 0) {
-            $score += min(10, (int) $profile->completed_jobs);
-            $reasons[] = 'Tiene trabajos completados.';
-        }
-
-        if ($profile->availability_status === 'available') {
-            $score += 5;
-            $reasons[] = 'Esta disponible para nuevos proyectos.';
+        if ($project !== null) {
+            MatchResult::query()->updateOrCreate(
+                [
+                    'mype_profile_id' => $project->mype_profile_id,
+                    'freelancer_profile_id' => $profile->id,
+                    'service_id' => null,
+                ],
+                [
+                    'compatibility_score' => $compatibility['score'],
+                    'reason' => implode(' ', $compatibility['reasons']),
+                    'status' => 'suggested',
+                ],
+            );
         }
 
         return [
@@ -147,8 +114,11 @@ class RecommendationController extends Controller
             'photo_url' => $this->storageUrl($profile->profile_photo),
             'skills' => $skills,
             'availability_status' => $profile->availability_status,
-            'score' => min(100, $score),
-            'reasons' => array_values(array_unique($reasons)),
+            'score' => $compatibility['score'],
+            'compatibility_score' => $compatibility['score'],
+            'compatibility_level' => $compatibility['level'],
+            'compatibility_breakdown' => $compatibility['breakdown'],
+            'reasons' => $compatibility['reasons'],
         ];
     }
 
@@ -156,19 +126,32 @@ class RecommendationController extends Controller
     {
         $item = $this->scoreProfile($profile, []);
         $item['score'] = min(100, 40 + (float) $profile->rating * 8 + min(20, (int) $profile->completed_jobs));
+        $item['compatibility_score'] = $item['score'];
+        $item['compatibility_level'] = 'Perfil destacado';
         $item['reasons'] = ['Perfil destacado por reputacion y experiencia.'];
 
         return $item;
     }
 
-    private function terms(string $value): array
+    private function hasSpecificRecommendationContext(array $filters): bool
     {
-        return array_values(array_filter(explode(' ', $value), fn(string $term) => strlen($term) >= 3));
+        return filled($filters['project_id'] ?? null)
+            || filled($filters['search'] ?? null)
+            || filled($filters['category'] ?? null)
+            || filled($filters['skill'] ?? null);
     }
 
-    private function normalize(string $value): string
+    private function hasRecommendableProfile(FreelancerProfile $profile): bool
     {
-        return strtolower(trim($value));
+        $profile->loadMissing(['skills', 'portfolioProjects', 'services']);
+
+        if (filled($profile->category) || filled($profile->headline) || filled($profile->bio)) {
+            return true;
+        }
+
+        return $profile->skills->isNotEmpty()
+            || $profile->portfolioProjects->isNotEmpty()
+            || $profile->services->isNotEmpty();
     }
 
     private function storageUrl(?string $path): ?string
@@ -180,16 +163,4 @@ class RecommendationController extends Controller
         return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
     }
 
-    private function parseRate(?string $rate): ?float
-    {
-        if ($rate === null) {
-            return null;
-        }
-
-        if (!preg_match('/\d+(?:[.,]\d+)?/', $rate, $matches)) {
-            return null;
-        }
-
-        return (float) str_replace(',', '.', $matches[0]);
-    }
 }

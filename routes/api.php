@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AdminDisputeController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\ClientProjectController;
+use App\Http\Controllers\Api\ContractController;
 use App\Http\Controllers\Api\FavoritesController;
 use App\Http\Controllers\Api\GeminiController;
 use App\Http\Controllers\Api\HealthController;
@@ -15,7 +17,9 @@ use App\Http\Controllers\Api\MypeController;
 use App\Http\Controllers\Api\ProfilesController;
 use App\Http\Controllers\Api\RecommendationController;
 use App\Http\Controllers\Api\ServicesController;
+use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\UsersController;
+use App\Http\Controllers\Api\WalletController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class);
@@ -27,6 +31,8 @@ Route::prefix('peru')->group(function (): void {
 
 Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*');
+
+Route::post('/webhooks/culqi', [SubscriptionController::class, 'culqiWebhook']);
 
 Route::prefix('auth')->group(function (): void {
     Route::post('/register', [AuthController::class, 'register']);
@@ -59,6 +65,24 @@ Route::middleware('auth.api')->group(function (): void {
 
     Route::get('/market/trends', [MarketInsightController::class, 'trends']);
     Route::get('/market/price-suggestion', [MarketInsightController::class, 'priceSuggestion']);
+    Route::get('/market/portfolio-health', [MarketInsightController::class, 'portfolioHealth']);
+
+    Route::get('/subscription', [SubscriptionController::class, 'show']);
+    Route::post('/subscription/checkout', [SubscriptionController::class, 'checkout']);
+
+    Route::get('/contracts', [ContractController::class, 'index']);
+    Route::post('/contracts', [ContractController::class, 'store']);
+    Route::get('/contracts/{contract}', [ContractController::class, 'show']);
+    Route::post('/contracts/{contract}/mock-pay', [ContractController::class, 'mockPay']);
+    Route::post('/contracts/{contract}/deliver', [ContractController::class, 'deliver']);
+    Route::get('/contracts/{contract}/deliveries', [ContractController::class, 'deliveries']);
+    Route::post('/contracts/{contract}/request-revision', [ContractController::class, 'requestRevision']);
+    Route::post('/contracts/{contract}/approve', [ContractController::class, 'approve']);
+    Route::post('/contracts/{contract}/dispute', [ContractController::class, 'dispute']);
+    Route::get('/contracts/{contract}/files/{deliveryFile}/download', [ContractController::class, 'downloadFile']);
+    Route::post('/admin/disputes/{dispute}/resolve', [AdminDisputeController::class, 'resolve']);
+    Route::get('/wallet', [WalletController::class, 'show']);
+    Route::post('/wallet/withdrawals', [WalletController::class, 'withdraw']);
 
     Route::get('/favorites', [FavoritesController::class, 'index']);
     Route::post('/favorites', [FavoritesController::class, 'store']);
