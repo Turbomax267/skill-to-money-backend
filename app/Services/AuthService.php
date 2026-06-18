@@ -8,6 +8,7 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -185,7 +186,14 @@ class AuthService
     private function authenticatedPayload(User $user): array
     {
         $token = $this->authRepository->createToken($user, 'auth');
-        $freshUser = $user->fresh(['freelancerProfile', 'mypeProfile']);
+        $relations = ['freelancerProfile', 'mypeProfile'];
+
+        if (Schema::hasTable('subscriptions')) {
+            $relations[] = 'activeSubscription';
+        }
+
+        $freshUser = $user->fresh($relations);
+        $subscription = Schema::hasTable('subscriptions') ? $freshUser->activeSubscription : null;
 
         $payload = [
             'token_type' => 'Bearer',
@@ -201,6 +209,8 @@ class AuthService
                 'email_verified_at' => $freshUser->email_verified_at?->toISOString(),
                 'user_type' => $freshUser->user_type,
                 'account_type' => $freshUser->user_type,
+                'subscription_plan' => $subscription?->plan === 'pro' ? 'pro' : 'free',
+                'subscription_status' => $subscription?->status ?? 'free',
             ],
         ];
 

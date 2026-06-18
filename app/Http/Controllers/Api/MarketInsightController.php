@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\ClientProject;
+use App\Services\ProfileScoringService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,10 @@ use Illuminate\Support\Str;
 class MarketInsightController extends Controller
 {
     use ApiResponse;
+
+    public function __construct(private readonly ProfileScoringService $scoring)
+    {
+    }
 
     public function trends(Request $request): JsonResponse
     {
@@ -111,6 +116,17 @@ class MarketInsightController extends Controller
         ]);
     }
 
+    public function portfolioHealth(Request $request): JsonResponse
+    {
+        $profile = $request->user()->freelancerProfile;
+
+        if ($profile === null) {
+            return $this->error('Freelancer profile not found.', ['profile' => ['Perfil freelancer no encontrado.']], 404);
+        }
+
+        return $this->success('Diagnostico de portafolio calculado.', $this->scoring->portfolioHealth($profile));
+    }
+
     private function marketProjects(array $keywords = [], ?string $category = null): Collection
     {
         $query = ClientProject::query()
@@ -118,16 +134,16 @@ class MarketInsightController extends Controller
             ->latest();
 
         if ($category) {
-            $query->where('category', 'like', '%' . $category . '%');
+            $query->where('category', $this->likeOperator(), '%' . $category . '%');
         }
 
         if (!empty($keywords)) {
             $query->where(function ($query) use ($keywords): void {
                 foreach ($keywords as $keyword) {
                     $query
-                        ->orWhere('title', 'like', "%{$keyword}%")
-                        ->orWhere('description', 'like', "%{$keyword}%")
-                        ->orWhere('category', 'like', "%{$keyword}%");
+                        ->orWhere('title', $this->likeOperator(), "%{$keyword}%")
+                        ->orWhere('description', $this->likeOperator(), "%{$keyword}%")
+                        ->orWhere('category', $this->likeOperator(), "%{$keyword}%");
                 }
             });
         }
@@ -204,6 +220,11 @@ class MarketInsightController extends Controller
         }
 
         return round(array_sum($values) / count($values), 2);
+    }
+
+    private function likeOperator(): string
+    {
+        return config('database.default') === 'pgsql' ? 'ilike' : 'like';
     }
 }
 

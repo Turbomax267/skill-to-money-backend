@@ -41,4 +41,9 @@ class MypeProfile extends Model
     {
         return $this->hasMany(ClientProject::class);
     }
+
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(Contract::class);
+    }
 }

@@ -58,6 +58,14 @@ return [
         'fallback_url' => env('PERU_API_FALLBACK_URL'),
     ],
 
+    'culqi' => [
+        'base_url' => env('CULQI_API_BASE_URL', 'https://api.culqi.com/v2'),
+        'public_key' => env('CULQI_PUBLIC_KEY'),
+        'private_key' => env('CULQI_PRIVATE_KEY'),
+        'webhook_secret' => env('CULQI_WEBHOOK_SECRET'),
+        'timeout' => env('CULQI_API_TIMEOUT', 20),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

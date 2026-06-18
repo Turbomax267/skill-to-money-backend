@@ -46,4 +46,9 @@ class Service extends Model
     {
         return $this->hasMany(MatchResult::class);
     }
+
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(Contract::class);
+    }
 }
