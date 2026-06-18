@@ -15,6 +15,10 @@ php artisan storage:link || true
 chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache "$PUBLIC_DISK_ROOT" /var/www/html/public/storage || true
 chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache || true
 
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+  php artisan migrate --force
+fi
+
 php artisan config:cache
 
 exec apache2-foreground
