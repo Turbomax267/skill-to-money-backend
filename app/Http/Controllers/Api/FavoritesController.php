@@ -107,11 +107,7 @@ class FavoritesController extends Controller
 
     private function storageUrl(?string $path): ?string
     {
-        if (!$path) {
-            return null;
-        }
-
-        return request()->getSchemeAndHttpHost() . '/api/media/' . ltrim($path, '/');
+        return $this->publicMediaUrl($path);
     }
 
     private function parseRate(?string $rate): ?float
