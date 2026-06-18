@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class CulqiService
@@ -13,7 +14,7 @@ class CulqiService
         $privateKey = (string) config('services.culqi.private_key');
 
         if ($privateKey === '') {
-            throw new RuntimeException('Culqi no está configurado. Agrega CULQI_PRIVATE_KEY en el backend.');
+            throw new RuntimeException('Culqi no esta configurado. Agrega CULQI_PRIVATE_KEY en el backend.');
         }
 
         try {
@@ -27,15 +28,39 @@ class CulqiService
             $message = data_get($body, 'merchant_message')
                 ?? data_get($body, 'user_message')
                 ?? data_get($body, 'message')
-                ?? 'Culqi rechazó el pago.';
+                ?? data_get($body, 'error.merchant_message')
+                ?? data_get($body, 'error.user_message')
+                ?? data_get($body, 'error.message')
+                ?? 'Culqi rechazo el pago.';
 
             throw new RuntimeException((string) $message, $exception->response?->status() ?? 422, $exception);
         }
 
-        $charge = $response->json();
+        $body = $response->json();
+        $charge = is_array($body)
+            ? (data_get($body, 'data.object') ?? data_get($body, 'data') ?? $body)
+            : null;
 
-        if (! is_array($charge) || data_get($charge, 'object') !== 'charge') {
-            throw new RuntimeException('Culqi devolvió una respuesta inesperada.');
+        if (! is_array($charge) || ! data_get($charge, 'id')) {
+            Log::warning('Culqi returned an unexpected charge response.', [
+                'response' => $body,
+            ]);
+
+            $message = data_get($body, 'merchant_message')
+                ?? data_get($body, 'user_message')
+                ?? data_get($body, 'message')
+                ?? data_get($body, 'error.merchant_message')
+                ?? data_get($body, 'error.user_message')
+                ?? data_get($body, 'error.message')
+                ?? 'Culqi devolvio una respuesta inesperada. Revisa los logs de Render para ver el detalle.';
+
+            throw new RuntimeException((string) $message);
+        }
+
+        if (data_get($charge, 'object') !== null && data_get($charge, 'object') !== 'charge') {
+            Log::warning('Culqi returned a non-charge object.', [
+                'response' => $body,
+            ]);
         }
 
         return $charge;
