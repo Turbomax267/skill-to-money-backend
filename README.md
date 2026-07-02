@@ -267,7 +267,7 @@ Si se despliega con Docker, Render usa el `Dockerfile`.
 El contenedor ejecuta:
 
 ```bash
-php artisan config:cache && apache2-foreground
+php artisan migrate --force && php artisan config:cache && apache2-foreground
 ```
 
 Health checks:
